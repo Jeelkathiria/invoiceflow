@@ -161,12 +161,15 @@ Frontend client runs on `http://localhost:5173`
 
 ---
 
-## Demo Credentials
+## Account Registration & User Credentials
 
-| Role | Email | Password | Access Rights |
-| :--- | :--- | :--- | :--- |
-| Finance Executive | `finance@gmail.com` | `finance` | Upload Invoices, Edit Line Items, Draft Cleanup, Submit to Manager |
-| Manager | `Manager@gmail.com` | `Manager` | View Approval Queue, Side-by-Side PDF Review, Approve/Reject, Analytics |
+- Finance Executive Role: Finance Executives register their own workspace account via the Public Signup Page (`/signup`). Any new user who registers on the platform receives a Finance Executive role to upload invoices, edit line items, and submit bills for approval.
+- Manager Role: Manager accounts use the fixed demo credentials (`Manager@gmail.com` / `Manager`) to access the Manager Approval Queue, review original invoice PDFs side-by-side, and approve or reject submissions with remarks.
+
+| Role | Registration / Credentials | Access Rights |
+| :--- | :--- | :--- |
+| Finance Executive | Register on `/signup` or use Quick Demo Access | Upload Invoices, Inspect OCR, Edit Line Items, Draft Cleanup, Submit to Manager |
+| Manager | `Manager@gmail.com` / `Manager` | View Approval Queue, Side-by-Side PDF Review, Approve/Reject, Analytics |
 
 ---
 
