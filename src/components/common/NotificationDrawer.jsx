@@ -1,107 +1,217 @@
-import { X, Bell, CheckCircle2, AlertTriangle, Sparkles, ArrowRight, ShieldAlert } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Bell, CheckCircle2, AlertTriangle, Sparkles, ArrowRight, ShieldAlert, Trash2, CheckCheck, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import api from '../../services/axios'
 
-const notifications = [
-  {
-    id: 1,
-    title: '3 Invoices Require Approval',
-    desc: 'Spectrum Supplies & CloudScale invoices are waiting for final authorization.',
-    time: '5m ago',
-    type: 'warning',
-    link: '/app/approval-queue'
-  },
-  {
-    id: 2,
-    title: 'Duplicate Invoice Warning',
-    desc: 'Amazon Web Services INV-2026-0041 matches existing submission INV-2026-0012.',
-    time: '25m ago',
-    type: 'danger',
-    link: '/app/invoices'
-  },
-  {
-    id: 3,
-    title: 'AI OCR Model Synchronized',
-    desc: 'Ingestion accuracy updated to 99.4% with GST tax breakdown engine.',
-    time: '2h ago',
-    type: 'info',
-    link: '/app'
-  },
-  {
-    id: 4,
-    title: 'Payment Scheduled',
-    desc: 'Apex Office Logistics invoice ₹89,500 queued for settlement.',
-    time: '4h ago',
-    type: 'success',
-    link: '/app/invoices'
-  }
-]
+function formatTimeAgo(dateString) {
+  if (!dateString) return 'Just now'
+  const date = new Date(dateString)
+  const now = new Date()
+  const seconds = Math.floor((now - date) / 1000)
+
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 export function NotificationDrawer({ isOpen, onClose }) {
   const navigate = useNavigate()
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [loading, setLoading] = useState(false)
+
+  const fetchNotifications = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('/notifications')
+      if (res.data && res.data.data) {
+        const list = res.data.data.notifications || []
+        setNotifications(list)
+        setUnreadCount(res.data.data.unreadCount || list.filter((n) => !n.read).length)
+      }
+    } catch (err) {
+      console.warn('[NotificationDrawer] Error fetching notifications:', err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications()
+    }
+  }, [isOpen])
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.put('/notifications/mark-all-read')
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (err) {
+      console.error('Failed to mark all as read:', err)
+    }
+  }
+
+  const handleItemClick = async (item) => {
+    try {
+      await api.put(`/notifications/${item._id}/read`)
+      setNotifications((prev) => prev.filter((n) => n._id !== item._id))
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+    } catch (err) {
+      console.error('Failed to mark notification read:', err)
+    }
+    onClose()
+    if (item.link) {
+      navigate(item.link)
+    }
+  }
+
+  const handleDeleteItem = async (e, id) => {
+    e.stopPropagation()
+    try {
+      await api.delete(`/notifications/${id}`)
+      setNotifications((prev) => prev.filter((n) => n._id !== id))
+      const remainingUnread = notifications.filter((n) => n._id !== id && !n.read).length
+      setUnreadCount(remainingUnread)
+    } catch (err) {
+      console.error('Failed to delete notification:', err)
+    }
+  }
+
+  const handleClearAll = async () => {
+    try {
+      await api.delete('/notifications/clear-all')
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (err) {
+      console.error('Failed to clear notifications:', err)
+    }
+  }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs animate-fadeIn">
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl p-6 flex flex-col justify-between light:bg-white light:border-slate-200">
+        <div className="w-screen max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl p-6 flex flex-col justify-between">
           <div>
             {/* Drawer Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 light:border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   <Bell className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white light:text-slate-900">Notifications</h2>
-                  <p className="text-xs text-slate-400 light:text-slate-500">4 unread operational alerts</p>
+                  <h2 className="text-base font-bold text-white">Notifications</h2>
+                  <p className="text-xs text-slate-400">
+                    {unreadCount > 0 ? `${unreadCount} unread operational alerts` : 'All alerts read'}
+                  </p>
                 </div>
               </div>
-              <button 
-                onClick={onClose}
-                className="rounded-xl border border-slate-800 bg-slate-800/60 p-2 text-slate-400 hover:text-white light:border-slate-200 light:bg-slate-100 light:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-800/60 px-2.5 py-1 text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-700 transition"
+                    title="Mark all as read"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5 text-blue-400" />
+                    <span>Read All</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={onClose}
+                  className="rounded-xl border border-slate-800 bg-slate-800/60 p-2 text-slate-400 hover:text-white transition"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Notification List */}
-            <div className="mt-6 space-y-3.5">
-              {notifications.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    onClose()
-                    navigate(item.link)
-                  }}
-                  className="p-4 rounded-2xl border border-slate-800/80 bg-slate-950/60 hover:border-indigo-500/40 hover:bg-slate-800/60 transition cursor-pointer light:border-slate-200 light:bg-slate-50 light:hover:bg-indigo-50/60"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      {item.type === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-400" />}
-                      {item.type === 'danger' && <ShieldAlert className="h-4 w-4 text-rose-400" />}
-                      {item.type === 'info' && <Sparkles className="h-4 w-4 text-indigo-400" />}
-                      {item.type === 'success' && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-                      <span className="text-xs font-bold text-white light:text-slate-900">{item.title}</span>
-                    </div>
-                    <span className="text-[10px] font-semibold text-slate-500">{item.time}</span>
-                  </div>
-                  <p className="mt-1.5 text-xs text-slate-400 light:text-slate-600 leading-relaxed">{item.desc}</p>
+            {/* Notification List from MongoDB */}
+            <div className="mt-4 space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+              {loading ? (
+                <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400 text-xs">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <span>Fetching MongoDB notifications...</span>
                 </div>
-              ))}
+              ) : notifications.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center text-xs text-slate-500 font-medium">
+                  <Bell className="h-8 w-8 text-slate-600 mx-auto mb-2 opacity-50" />
+                  No active notifications found in MongoDB.
+                </div>
+              ) : (
+                notifications.map((item) => (
+                  <div
+                    key={item._id}
+                    onClick={() => handleItemClick(item)}
+                    className={`group relative p-4 rounded-2xl border transition cursor-pointer ${
+                      !item.read
+                        ? 'border-blue-500/40 bg-slate-800/80 shadow-xs'
+                        : 'border-slate-800/80 bg-slate-950/60 hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {item.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />}
+                        {item.type === 'danger' && <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />}
+                        {item.type === 'info' && <Sparkles className="h-4 w-4 shrink-0 text-blue-400" />}
+                        {item.type === 'success' && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />}
+                        <span className={`text-xs font-bold truncate ${!item.read ? 'text-white font-extrabold' : 'text-slate-300'}`}>
+                          {item.title}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          {formatTimeAgo(item.createdAt)}
+                        </span>
+                        <button
+                          onClick={(e) => handleDeleteItem(e, item._id)}
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition"
+                          title="Delete notification"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">{item.message}</p>
+
+                    {!item.read && (
+                      <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-blue-500 ring-4 ring-slate-900"></span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           {/* Drawer Footer */}
-          <div className="border-t border-slate-800 pt-4 light:border-slate-200">
+          <div className="border-t border-slate-800 pt-4 flex items-center justify-between gap-3">
+            {notifications.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="text-xs font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Clear All
+              </button>
+            )}
+
             <button
               onClick={() => {
                 onClose()
                 navigate('/app/approval-queue')
               }}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3 text-xs font-bold text-white transition hover:bg-indigo-500"
+              className="ml-auto flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-500 shadow-sm"
             >
-              <span>View All Approvals</span>
+              <span>Approval Queue</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>

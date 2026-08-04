@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import Button from '../common/Button.jsx';
 import StatusBadge from './StatusBadge.jsx';
+import { formatCurrency } from '../../utils/formatCurrency.js';
 
 export default function Drawer({ open, onClose, invoice }) {
   return (
@@ -47,15 +48,15 @@ export default function Drawer({ open, onClose, invoice }) {
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900">Due date</p>
-                    <p className="mt-2">{invoice?.dueDate || 'Sep 24, 2026'}</p>
+                    <p className="mt-2">{invoice?.dueDate && invoice?.dueDate !== 'null' ? invoice.dueDate : '-'}</p>
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900">Amount</p>
-                    <p className="mt-2">{invoice?.amount || '₹12,840'}</p>
+                    <p className="mt-2">{typeof invoice?.amount === 'number' ? formatCurrency(invoice.amount, invoice?.currency) : (invoice?.amount || '₹12,840')}</p>
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900">GST</p>
-                    <p className="mt-2">{invoice?.gst || '₹1,152'}</p>
+                    <p className="mt-2">{typeof invoice?.gst === 'number' ? formatCurrency(invoice.gst, invoice?.currency) : (invoice?.gst || '₹1,152')}</p>
                   </div>
                 </div>
               </div>

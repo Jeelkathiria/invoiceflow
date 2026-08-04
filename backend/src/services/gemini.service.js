@@ -65,8 +65,8 @@ Output ONLY a raw, valid JSON object matching this schema:
   "vendorGstin": "string or null",
   "invoiceNumber": "string",
   "invoiceDate": "YYYY-MM-DD",
-  "dueDate": "YYYY-MM-DD",
-  "currency": "INR",
+  "dueDate": "YYYY-MM-DD (or null if not mentioned in the bill)",
+  "currency": "USD or INR (detect directly from bill document: '$' or 'USD' -> 'USD', '₹' or 'Rs' or 'INR' -> 'INR')",
   "subtotal": number,
   "gst": number,
   "discount": number,
@@ -127,7 +127,19 @@ function sanitizeExtractedJSON(data, fileName = '') {
   const invoiceNumber = data.invoiceNumber || fallback.invoiceNumber
   const vendorGstin = data.vendorGstin || fallback.vendorGstin
   const invoiceDate = data.invoiceDate || fallback.invoiceDate
-  const dueDate = data.dueDate || fallback.dueDate
+  const isValidDueDate = data.dueDate && data.dueDate !== 'null' && data.dueDate !== 'N/A' && data.dueDate !== 'undefined'
+  const dueDate = isValidDueDate ? data.dueDate : null
+  let currency = 'INR'
+  if (data.currency) {
+    const currUpper = String(data.currency).toUpperCase()
+    if (currUpper.includes('USD') || currUpper.includes('$')) {
+      currency = 'USD'
+    } else if (currUpper.includes('EUR') || currUpper.includes('€')) {
+      currency = 'EUR'
+    } else if (currUpper.includes('GBP') || currUpper.includes('£')) {
+      currency = 'GBP'
+    }
+  }
   const subtotal = Number(data.subtotal) || fallback.subtotal
   const gst = Number(data.gst) || fallback.gst
   const discount = Number(data.discount) || fallback.discount
@@ -157,7 +169,7 @@ function sanitizeExtractedJSON(data, fileName = '') {
     invoiceNumber,
     invoiceDate,
     dueDate,
-    currency: data.currency || 'INR',
+    currency,
     subtotal,
     gst,
     discount,
@@ -182,7 +194,7 @@ function getFallbackInvoiceData(fileName = '') {
     vendorGstin: '22-AAAAA0000A-1-Z-5',
     invoiceNumber: 'INV-001',
     invoiceDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date().toISOString().split('T')[0],
+    dueDate: null,
     currency: 'INR',
     subtotal: 0,
     gst: 0,

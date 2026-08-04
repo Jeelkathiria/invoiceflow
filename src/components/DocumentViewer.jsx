@@ -5,8 +5,9 @@ export function generateInvoiceSVG(invoice) {
   const invNumber = invoice?.invoiceNumber || invoice?.id || 'INV-2026-001'
   const vendor = invoice?.vendorName || invoice?.vendor || 'Vendor Business Ltd'
   const gstin = invoice?.vendorGstin || '22-AAAAA0000A-1-Z-5'
-  const date = invoice?.invoiceDate || '2026-08-01'
-  const due = invoice?.dueDate || '2026-08-10'
+  const date = invoice?.invoiceDate || '-'
+  const due = (invoice?.dueDate && invoice.dueDate !== 'null' && invoice.dueDate !== 'undefined' && invoice.dueDate !== '-') ? (typeof invoice.dueDate === 'string' && !invoice.dueDate.includes('T') ? invoice.dueDate : new Date(invoice.dueDate).toLocaleDateString()) : '-'
+  const sym = (invoice?.currency === 'USD' || invoice?.currency === '$') ? '$' : (invoice?.currency === 'EUR' || invoice?.currency === '€' ? '€' : (invoice?.currency === 'GBP' || invoice?.currency === '£' ? '£' : '₹'))
   const total = (invoice?.totalAmount || invoice?.amount || 0).toLocaleString('en-IN')
   const subtotal = (invoice?.subtotal || Math.round((invoice?.totalAmount || invoice?.amount || 0) * 0.85)).toLocaleString('en-IN')
   const gst = (invoice?.gst || invoice?.gstAmount || Math.round((invoice?.totalAmount || invoice?.amount || 0) * 0.15)).toLocaleString('en-IN')
@@ -26,8 +27,8 @@ export function generateInvoiceSVG(invoice) {
       <rect x="40" y="${y - 16}" width="520" height="24" fill="${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}" rx="4"/>
       <text x="52" y="${y}" font-size="10" font-weight="600" fill="#1e293b">${desc}</text>
       <text x="310" y="${y}" font-size="10" fill="#475569">${qty}</text>
-      <text x="420" y="${y}" font-size="10" fill="#475569" text-anchor="end">₹${rate}</text>
-      <text x="548" y="${y}" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">₹${itemTotal}</text>
+      <text x="420" y="${y}" font-size="10" fill="#475569" text-anchor="end">${sym}${rate}</text>
+      <text x="548" y="${y}" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">${sym}${itemTotal}</text>
     `
           })
           .join('')
@@ -35,8 +36,8 @@ export function generateInvoiceSVG(invoice) {
       <rect x="40" y="219" width="520" height="24" fill="#ffffff" rx="4"/>
       <text x="52" y="235" font-size="10" font-weight="600" fill="#1e293b">General Extracted Line Goods &amp; Services</text>
       <text x="310" y="235" font-size="10" fill="#475569">1</text>
-      <text x="420" y="235" font-size="10" fill="#475569" text-anchor="end">₹${subtotal}</text>
-      <text x="548" y="235" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">₹${total}</text>
+      <text x="420" y="235" font-size="10" fill="#475569" text-anchor="end">${sym}${subtotal}</text>
+      <text x="548" y="235" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">${sym}${total}</text>
     `
 
   const svgContent = `
@@ -62,7 +63,7 @@ export function generateInvoiceSVG(invoice) {
 
       <rect x="310" y="112" width="250" height="65" fill="#eff6ff" rx="8" stroke="#bfdbfe"/>
       <text x="322" y="130" font-size="9" font-weight="bold" fill="#1d4ed8">PAYMENT SUMMARY</text>
-      <text x="322" y="150" font-size="13" font-weight="900" fill="#1e40af">TOTAL PAYABLE: ₹${total}</text>
+      <text x="322" y="150" font-size="13" font-weight="900" fill="#1e40af">TOTAL PAYABLE: ${sym}${total}</text>
       <text x="322" y="164" font-size="9" fill="#3b82f6" font-weight="bold">InvoiceFlow AI Document Guard</text>
 
       <!-- Table Header -->
@@ -78,14 +79,14 @@ export function generateInvoiceSVG(invoice) {
       <!-- Footer Financial Totals -->
       <rect x="330" y="575" width="230" height="85" fill="#f8fafc" rx="8" stroke="#e2e8f0"/>
       <text x="345" y="598" font-size="10" fill="#64748b">Subtotal:</text>
-      <text x="545" y="598" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">₹${subtotal}</text>
+      <text x="545" y="598" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">${sym}${subtotal}</text>
 
-      <text x="345" y="616" font-size="10" fill="#64748b">GST Tax (18%):</text>
-      <text x="545" y="616" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">₹${gst}</text>
+      <text x="345" y="616" font-size="10" fill="#64748b">Tax / GST:</text>
+      <text x="545" y="616" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="end">${sym}${gst}</text>
 
       <line x1="345" y1="626" x2="545" y2="626" stroke="#cbd5e1" stroke-width="1"/>
       <text x="345" y="645" font-size="11" font-weight="900" fill="#0f172a">Grand Total:</text>
-      <text x="545" y="645" font-size="12" font-weight="900" fill="#2563eb" text-anchor="end">₹${total}</text>
+      <text x="545" y="645" font-size="12" font-weight="900" fill="#2563eb" text-anchor="end">${sym}${total}</text>
 
       <!-- Verification Seal -->
       <circle cx="110" cy="618" r="32" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 2"/>

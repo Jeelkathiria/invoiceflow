@@ -10,6 +10,7 @@ import invoiceRoutes from './src/routes/invoice.routes.js'
 import approvalRoutes from './src/routes/approval.routes.js'
 import dashboardRoutes from './src/routes/dashboard.routes.js'
 import profileRoutes from './src/routes/profile.routes.js'
+import notificationRoutes from './src/routes/notification.routes.js'
 import { errorHandler } from './src/middleware/error.middleware.js'
 import { errorResponse } from './src/utils/apiResponse.js'
 
@@ -44,6 +45,7 @@ app.use('/api/invoices', invoiceRoutes)
 app.use('/api/approvals', approvalRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/profile', profileRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 // 404 Handler
 app.use((req, res) => {

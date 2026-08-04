@@ -1,5 +1,7 @@
 import cloudinary from '../config/cloudinary.js'
 import { Invoice } from '../models/Invoice.js'
+import { Notification } from '../models/Notification.js'
+import { User } from '../models/User.js'
 import { extractInvoiceData } from './gemini.service.js'
 import { checkDuplicateInvoice } from '../utils/duplicateChecker.js'
 
@@ -66,6 +68,35 @@ export const processAndSaveInvoice = async (file, userId) => {
   const invoice = await Invoice.create(invoiceData)
   console.log(`[MongoDB Persistence]: Saved Invoice ID ${invoice._id} for Vendor "${invoice.vendorName}" by User ${userId || 'anonymous'}`)
 
+  try {
+    let uploaderName = 'Finance Executive'
+    if (userId) {
+      const uploader = await User.findById(userId)
+      if (uploader?.name) uploaderName = uploader.name
+    }
+    const sym = (invoice.currency === 'USD' || invoice.currency === '$') ? '$' : '₹'
+
+    if (isDuplicate) {
+      await Notification.create({
+        title: 'Duplicate Invoice Risk',
+        message: `${uploaderName} uploaded Invoice #${invoice.invoiceNumber} from ${invoice.vendorName}, flagged as potential duplicate.`,
+        type: 'warning',
+        link: '/app/approval-queue',
+        recipientRole: 'manager',
+      })
+    } else {
+      await Notification.create({
+        title: 'New Invoice Uploaded',
+        message: `${uploaderName} uploaded Invoice #${invoice.invoiceNumber} from ${invoice.vendorName} (${sym}${amount.toLocaleString()}) for approval.`,
+        type: 'info',
+        link: '/app/approval-queue',
+        recipientRole: 'manager',
+      })
+    }
+  } catch (err) {
+    console.warn('Notification creation error:', err.message)
+  }
+
   return invoice
 }
 
@@ -125,6 +156,29 @@ export const updateInvoice = async (id, updateData) => {
     error.statusCode = 404
     throw error
   }
+
+  if (updateData.status && (updateData.status === 'Approved' || updateData.status === 'Rejected' || updateData.status === 'Pending')) {
+    try {
+      const isPending = updateData.status === 'Pending'
+      const recipientRole = isPending ? 'manager' : 'finance'
+      const title = isPending ? 'Invoice Submitted for Approval' : `Invoice ${updateData.status}`
+      const sym = (invoice.currency === 'USD' || invoice.currency === '$') ? '$' : '₹'
+
+      await Notification.create({
+        title,
+        message: isPending
+          ? `Invoice #${invoice.invoiceNumber} from ${invoice.vendorName || 'Vendor'} (${sym}${(invoice.amount || 0).toLocaleString()}) was submitted for authorization.`
+          : `Invoice #${invoice.invoiceNumber} from ${invoice.vendorName || 'Vendor'} was ${updateData.status.toLowerCase()}.`,
+        type: updateData.status === 'Approved' ? 'success' : updateData.status === 'Rejected' ? 'danger' : 'info',
+        link: isPending ? '/app/approval-queue' : '/app/invoices',
+        recipientRole,
+        user: isPending ? null : (invoice.uploadedBy || null),
+      })
+    } catch (err) {
+      console.warn('Notification trigger error:', err.message)
+    }
+  }
+
   return invoice
 }
 

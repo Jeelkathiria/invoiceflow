@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, AlertCircle, Eye, CheckCircle2, ShieldCheck } from 'lucide-react'
 
+import { formatCurrency } from '../../utils/formatCurrency'
+
 export function UpcomingPayments({ liveInvoices = [] }) {
   const navigate = useNavigate()
 
@@ -11,8 +13,8 @@ export function UpcomingPayments({ liveInvoices = [] }) {
       id: inv._id,
       invoiceNumber: inv.invoiceNumber || 'INV-001',
       vendor: inv.vendorName || 'Unknown Vendor',
-      due: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : 'Upcoming',
-      amount: `₹${(inv.amount || inv.totalAmount || 0).toLocaleString('en-IN')}`,
+      due: (inv.dueDate && inv.dueDate !== 'null' && !isNaN(new Date(inv.dueDate).getTime())) ? new Date(inv.dueDate).toLocaleDateString() : '-',
+      amount: formatCurrency(inv.amount || inv.totalAmount || 0, inv.currency),
       remaining: inv.status === 'Approved' ? 'Ready for ERP' : 'Pending Review',
       ready: inv.status === 'Approved',
     }))

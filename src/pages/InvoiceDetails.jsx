@@ -21,6 +21,8 @@ import {
   Loader2
 } from 'lucide-react'
 
+import { formatCurrency } from '../utils/formatCurrency'
+
 export function InvoiceDetails() {
   const { user } = useAuth()
   const userRole = (user?.role || 'finance').toLowerCase()
@@ -76,8 +78,8 @@ export function InvoiceDetails() {
           vendorName: resData.vendorName || 'Unknown Vendor',
           vendorGstin: resData.vendorGstin || '22-AAAAA0000A-1-Z-5',
           category: resData.category || 'General Expense',
-          invoiceDate: resData.invoiceDate ? new Date(resData.invoiceDate).toLocaleDateString() : '2026-08-01',
-          dueDate: resData.dueDate ? new Date(resData.dueDate).toLocaleDateString() : '2026-08-15',
+          invoiceDate: resData.invoiceDate ? new Date(resData.invoiceDate).toLocaleDateString() : '-',
+          dueDate: resData.dueDate ? new Date(resData.dueDate).toLocaleDateString() : '-',
           paymentTerms: 'Net 15',
           submittedBy: resData.uploadedBy?.name || 'Finance Executive',
           confidence: resData.confidenceScore || 95.0,
@@ -86,6 +88,7 @@ export function InvoiceDetails() {
           subtotal: resData.subtotal || Math.round((resData.amount || 0) * 0.85),
           gstAmount: resData.gst || Math.round((resData.amount || 0) * 0.15),
           totalAmount: resData.amount || resData.totalAmount || 0,
+          currency: resData.currency || 'INR',
           invoiceUrl: resData.invoiceUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
           lineItems: (resData.lineItems && resData.lineItems.length > 0)
             ? resData.lineItems.map((item, idx) => ({
@@ -446,8 +449,8 @@ export function InvoiceDetails() {
                     <tr key={item.id}>
                       <td className="py-3 px-3 font-semibold text-slate-900">{item.desc}</td>
                       <td className="py-3 px-3 text-center text-slate-600 font-bold">{item.qty}</td>
-                      <td className="py-3 px-3 text-right text-slate-600">₹{item.rate.toLocaleString()}</td>
-                      <td className="py-3 px-3 text-right font-bold text-slate-900">₹{item.total.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right text-slate-600">{formatCurrency(item.rate, invoice.currency)}</td>
+                      <td className="py-3 px-3 text-right font-bold text-slate-900">{formatCurrency(item.total, invoice.currency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -458,15 +461,15 @@ export function InvoiceDetails() {
               <div className="w-full max-w-xs space-y-2 text-xs">
                 <div className="flex justify-between text-slate-500">
                   <span>Subtotal</span>
-                  <span className="font-bold text-slate-800">₹{invoice.subtotal.toLocaleString()}</span>
+                  <span className="font-bold text-slate-800">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
-                  <span>GST (18%)</span>
-                  <span className="font-bold text-slate-800">₹{invoice.gstAmount.toLocaleString()}</span>
+                  <span>Tax / GST</span>
+                  <span className="font-bold text-slate-800">{formatCurrency(invoice.gstAmount, invoice.currency)}</span>
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-2 text-sm">
                   <span className="font-black text-slate-900">Grand Total</span>
-                  <span className="font-black text-blue-600">₹{invoice.totalAmount.toLocaleString()}</span>
+                  <span className="font-black text-blue-600">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
                 </div>
               </div>
             </div>
@@ -513,7 +516,7 @@ export function InvoiceDetails() {
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-100">
                 <span className="text-slate-400">Payment Due Date</span>
-                <span className="font-bold text-amber-700">{invoice.dueDate} ({invoice.paymentTerms})</span>
+                <span className="font-bold text-amber-700">{invoice.dueDate && invoice.dueDate !== 'null' ? invoice.dueDate : '-'}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-100">
                 <span className="text-slate-400">Submitted By</span>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ListChecks, ArrowRight, ShieldCheck } from 'lucide-react'
+import { formatCurrency } from '../../utils/formatCurrency'
 
 const priorityBadge = {
   High: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -16,7 +17,7 @@ export function PendingQueue({ liveInvoices = [] }) {
           id: inv._id,
           invoice: inv.invoiceNumber || 'INV-001',
           vendor: inv.vendorName || 'Unknown Vendor',
-          amount: `₹${(inv.amount || inv.totalAmount || 0).toLocaleString('en-IN')}`,
+          amount: formatCurrency(inv.amount || inv.totalAmount || 0, inv.currency),
           submittedBy: inv.uploadedBy?.name || 'Finance Executive',
           priority: (inv.amount || 0) > 100000 ? 'High' : (inv.amount || 0) > 40000 ? 'Medium' : 'Low',
         }))

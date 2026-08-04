@@ -22,6 +22,8 @@ import {
   Calendar
 } from 'lucide-react'
 
+import { formatCurrency } from '../utils/formatCurrency'
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 const MAX_FILES = 10
 const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']
@@ -41,7 +43,7 @@ function getFallbackInvoiceData(fileName, index) {
   let gstin = '27AAFCV2449G1Z7'
   let invNumber = 'SB/2'
   let date = '2025-01-20'
-  let due = '2025-01-20'
+  let due = '-'
   let totalAmount = 6043
   let subtotal = 5500
   let gst = 793
@@ -243,8 +245,8 @@ export function UploadInvoice() {
               vendorName: apiInv.vendorName || 'Extracted Vendor',
               vendorGstin: apiInv.vendorGstin || '22-AAAAA0000A-1-Z-5',
               invoiceNumber: apiInv.invoiceNumber || 'INV-001',
-              invoiceDate: apiInv.invoiceDate ? new Date(apiInv.invoiceDate).toLocaleDateString() : '2025-01-20',
-              dueDate: apiInv.dueDate ? new Date(apiInv.dueDate).toLocaleDateString() : '2025-01-20',
+              invoiceDate: apiInv.invoiceDate ? new Date(apiInv.invoiceDate).toLocaleDateString() : '-',
+              dueDate: apiInv.dueDate ? new Date(apiInv.dueDate).toLocaleDateString() : '-',
               currency: apiInv.currency || 'INR',
               category: apiInv.category || 'General Invoices',
               subtotal: apiInv.subtotal || 0,
@@ -664,7 +666,7 @@ export function UploadInvoice() {
                   <div className="flex items-center justify-between md:justify-end gap-3 border-t border-slate-100 pt-3 md:border-0 md:pt-0">
                     <div className="text-left md:text-right">
                       <span className="text-[9px] font-bold uppercase text-slate-400">Total Payable</span>
-                      <p className="text-lg font-black text-slate-900">₹{inv.totalAmount.toLocaleString()}</p>
+                      <p className="text-lg font-black text-slate-900">{formatCurrency(inv.totalAmount, inv.currency)}</p>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -676,12 +678,21 @@ export function UploadInvoice() {
                       </button>
 
                       {inv.duplicate ? (
-                        <button
-                          onClick={() => setOverrideModalInvoice(inv)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition"
-                        >
-                          <AlertTriangle className="h-3.5 w-3.5" /> Approve Duplicate?
-                        </button>
+                        <>
+                          <button
+                            onClick={() => removeFile(inv.id)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                            title="Cancel and remove duplicate invoice"
+                          >
+                            <X className="h-3.5 w-3.5 stroke-[2.5]" /> Cancel
+                          </button>
+                          <button
+                            onClick={() => setOverrideModalInvoice(inv)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition"
+                          >
+                            <AlertTriangle className="h-3.5 w-3.5" /> Approve Duplicate?
+                          </button>
+                        </>
                       ) : (
                         <button
                           onClick={() => sendToApprovalQueue(inv)}
@@ -721,12 +732,21 @@ export function UploadInvoice() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setOverrideModalInvoice(inv)}
-                      className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-800 transition"
-                    >
-                      <ShieldCheck className="h-3 w-3" /> Review & Pass to Approve
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => removeFile(inv.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-800 hover:bg-rose-100 transition"
+                      >
+                        <X className="h-3 w-3" /> Cancel & Remove
+                      </button>
+
+                      <button
+                        onClick={() => setOverrideModalInvoice(inv)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-800 transition"
+                      >
+                        <ShieldCheck className="h-3 w-3" /> Review & Pass to Approve
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -772,17 +792,17 @@ export function UploadInvoice() {
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-[10px] font-bold uppercase text-slate-400">Invoice Date</span>
-                    <p className="font-bold text-slate-900 mt-0.5">{selectedInvoice.invoiceDate}</p>
-                    <p className="text-[10px] text-amber-700 font-bold">Due: {selectedInvoice.dueDate}</p>
+                    <p className="font-bold text-slate-900 mt-0.5">{selectedInvoice.invoiceDate || '-'}</p>
+                    <p className="text-[10px] text-amber-700 font-bold">Due: {selectedInvoice.dueDate && selectedInvoice.dueDate !== 'null' ? selectedInvoice.dueDate : '-'}</p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-[10px] font-bold uppercase text-slate-400">Subtotal & GST</span>
-                    <p className="font-bold text-slate-900 mt-0.5">Subtotal: ₹{selectedInvoice.subtotal.toLocaleString()}</p>
-                    <p className="text-[10px] text-slate-500">GST: ₹{selectedInvoice.gst.toLocaleString()}</p>
+                    <p className="font-bold text-slate-900 mt-0.5">Subtotal: {formatCurrency(selectedInvoice.subtotal, selectedInvoice.currency)}</p>
+                    <p className="text-[10px] text-slate-500">GST: {formatCurrency(selectedInvoice.gst, selectedInvoice.currency)}</p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-blue-50/60 border-blue-200 p-3">
                     <span className="text-[10px] font-bold uppercase text-blue-700">Total Payable</span>
-                    <p className="text-lg font-black text-slate-900 mt-0.5">₹{selectedInvoice.totalAmount.toLocaleString()}</p>
+                    <p className="text-lg font-black text-slate-900 mt-0.5">{formatCurrency(selectedInvoice.totalAmount, selectedInvoice.currency)}</p>
                   </div>
                 </div>
 
@@ -807,9 +827,9 @@ export function UploadInvoice() {
                           <tr key={idx}>
                             <td className="py-2 px-3 font-semibold text-slate-900">{item.description}</td>
                             <td className="py-2 px-3 text-center font-bold text-slate-700">{item.quantity}</td>
-                            <td className="py-2 px-3 text-right text-slate-600">₹{item.unitPrice.toLocaleString()}</td>
-                            <td className="py-2 px-3 text-right text-slate-600">₹{item.tax.toLocaleString()}</td>
-                            <td className="py-2 px-3 text-right font-bold text-slate-900">₹{(item.total || item.amount || 0).toLocaleString()}</td>
+                            <td className="py-2 px-3 text-right text-slate-600">{formatCurrency(item.unitPrice, selectedInvoice.currency)}</td>
+                            <td className="py-2 px-3 text-right text-slate-600">{formatCurrency(item.tax, selectedInvoice.currency)}</td>
+                            <td className="py-2 px-3 text-right font-bold text-slate-900">{formatCurrency(item.total || item.amount || 0, selectedInvoice.currency)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -916,10 +936,13 @@ export function UploadInvoice() {
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
               <button
-                onClick={() => setOverrideModalInvoice(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                onClick={() => {
+                  removeFile(overrideModalInvoice.id)
+                  setOverrideModalInvoice(null)
+                }}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition flex items-center gap-1"
               >
-                Cancel
+                <X className="h-3.5 w-3.5" /> Cancel & Remove Duplicate
               </button>
 
               <button

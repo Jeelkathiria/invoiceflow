@@ -13,7 +13,21 @@ const notificationSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
+    },
+    recipientRole: {
+      type: String,
+      enum: ['all', 'manager', 'finance'],
+      default: 'all',
+    },
+    type: {
+      type: String,
+      enum: ['info', 'warning', 'danger', 'success'],
+      default: 'info',
+    },
+    link: {
+      type: String,
+      default: '/app',
     },
     read: {
       type: Boolean,

@@ -22,6 +22,14 @@ import {
 
 const ITEMS_PER_PAGE = 12
 
+import { formatCurrency } from '../utils/formatCurrency'
+
+const formatDate = (dateStr) => {
+  if (!dateStr || dateStr === 'null' || dateStr === 'undefined' || dateStr === '-' || dateStr === 'Invalid Date') return '-'
+  const d = new Date(dateStr)
+  return isNaN(d.getTime()) ? '-' : d.toLocaleDateString()
+}
+
 export function AllInvoices() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,11 +55,12 @@ export function AllInvoices() {
           invoiceNumber: inv.invoiceNumber || 'INV-001',
           vendorName: inv.vendorName || 'Unknown Vendor',
           amount: inv.amount || inv.totalAmount || 0,
+          currency: inv.currency || 'INR',
           subtotal: inv.subtotal || 0,
           gst: inv.gst || 0,
           status: inv.status || 'Pending',
-          invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '2026-08-01',
-          dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '2026-08-10',
+          invoiceDate: formatDate(inv.invoiceDate),
+          dueDate: formatDate(inv.dueDate),
           category: inv.category || 'General Invoices',
           confidenceScore: inv.confidenceScore || 95.0,
           duplicate: Boolean(inv.duplicate),
@@ -292,8 +301,8 @@ export function AllInvoices() {
 
                     {/* Date & Due */}
                     <td className="py-3.5 px-4">
-                      <p className="font-semibold text-slate-800">{inv.invoiceDate}</p>
-                      <p className="text-[10px] text-amber-700 font-bold">Due: {inv.dueDate}</p>
+                      <p className="font-semibold text-slate-800">{inv.invoiceDate || '-'}</p>
+                      <p className="text-[10px] text-amber-700 font-bold">Due: {inv.dueDate && inv.dueDate !== 'null' ? inv.dueDate : '-'}</p>
                     </td>
 
                     {/* AI Confidence */}
@@ -311,7 +320,7 @@ export function AllInvoices() {
 
                     {/* Amount */}
                     <td className="py-3.5 px-4 text-right">
-                      <p className="text-sm font-black text-slate-900">₹{inv.amount.toLocaleString()}</p>
+                      <p className="text-sm font-black text-slate-900">{formatCurrency(inv.amount, inv.currency)}</p>
                     </td>
 
                     {/* Status */}
@@ -446,15 +455,19 @@ export function AllInvoices() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
                   <div className="flex justify-between font-bold">
                     <span className="text-slate-500">Total Payable:</span>
-                    <span className="text-slate-900">₹{selectedInvoice.amount.toLocaleString()}</span>
+                    <span className="text-slate-900">{formatCurrency(selectedInvoice.amount, selectedInvoice.currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Subtotal / Tax:</span>
-                    <span className="text-slate-800 font-semibold">₹{selectedInvoice.subtotal.toLocaleString()} + ₹{selectedInvoice.gst.toLocaleString()} GST</span>
+                    <span className="text-slate-800 font-semibold">{formatCurrency(selectedInvoice.subtotal, selectedInvoice.currency)} + {formatCurrency(selectedInvoice.gst, selectedInvoice.currency)} GST</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Invoice Date:</span>
                     <span className="text-slate-800 font-semibold">{selectedInvoice.invoiceDate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Due Date:</span>
+                    <span className="text-amber-700 font-bold">{selectedInvoice.dueDate && selectedInvoice.dueDate !== 'Invalid Date' && selectedInvoice.dueDate !== 'null' ? selectedInvoice.dueDate : '-'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Vendor GSTIN:</span>
@@ -475,7 +488,7 @@ export function AllInvoices() {
                       {(selectedInvoice.lineItems || []).map((li, idx) => (
                         <tr key={idx}>
                           <td className="p-2 font-medium text-slate-900">{li.description}</td>
-                          <td className="p-2 text-right font-bold text-slate-900">₹{(li.total || li.amount || (li.quantity * li.unitPrice) || 0).toLocaleString()}</td>
+                          <td className="p-2 text-right font-bold text-slate-900">{formatCurrency(li.total || li.amount || (li.quantity * li.unitPrice) || 0, selectedInvoice.currency)}</td>
                         </tr>
                       ))}
                     </tbody>

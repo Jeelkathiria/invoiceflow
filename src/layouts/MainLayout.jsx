@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom'
 import { Bell, FileText, Home, ListChecks, LogOut, User, Search, Plus, Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { GlobalSearchModal } from '../components/common/GlobalSearchModal'
 import { NotificationDrawer } from '../components/common/NotificationDrawer'
+import api from '../services/axios'
 
 export function MainLayout() {
   const { user, logout } = useAuth()
@@ -12,6 +13,21 @@ export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await api.get('/notifications')
+        if (res.data && res.data.data) {
+          setUnreadCount(res.data.data.unreadCount || 0)
+        }
+      } catch (err) {
+        // quiet error
+      }
+    }
+    fetchUnreadCount()
+  }, [isNotificationsOpen])
 
   const userRole = (user?.role || 'finance').toLowerCase()
   const isManager = userRole === 'manager'
@@ -26,7 +42,7 @@ export function MainLayout() {
   const navItems = isManager
     ? [
         { to: '/app', label: 'Dashboard', icon: Home, badge: null },
-        { to: '/app/approval-queue', label: 'Approval Queue', icon: ListChecks, badge: '3' },
+        { to: '/app/approval-queue', label: 'Approval Queue', icon: ListChecks, badge: null },
         { to: '/app/invoices', label: 'All Invoices', icon: FileText, badge: null },
         { to: '/app/profile', label: 'Profile', icon: User, badge: null },
       ]
@@ -183,7 +199,11 @@ export function MainLayout() {
               title="Notifications"
             >
               <Bell className="h-4 w-4" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500"></span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white shadow-xs">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
 
             <button

@@ -1,6 +1,7 @@
 import { Invoice } from '../models/Invoice.js'
 import { ApprovalLog } from '../models/ApprovalLog.js'
 import { Notification } from '../models/Notification.js'
+import { User } from '../models/User.js'
 
 export const getPendingApprovals = async () => {
   return await Invoice.find({ status: 'Pending' })
@@ -28,13 +29,25 @@ export const approveInvoice = async (invoiceId, userId, comment = '') => {
     comment: comment || 'Invoice approved for settlement',
   })
 
-  // Create Notification for the uploader
-  if (invoice.uploadedBy) {
+  // Create Notification specifically for Finance users with Manager name
+  try {
+    let managerName = 'Manager'
+    if (userId) {
+      const manager = await User.findById(userId)
+      if (manager?.name) managerName = manager.name
+    }
+    const sym = (invoice.currency === 'USD' || invoice.currency === '$') ? '$' : '₹'
+
     await Notification.create({
       title: 'Invoice Approved',
-      message: `Invoice ${invoice.invoiceNumber} for ₹${invoice.amount.toLocaleString()} was approved.`,
-      user: invoice.uploadedBy,
+      message: `${managerName} approved Invoice #${invoice.invoiceNumber} from ${invoice.vendorName || 'Vendor'} (${sym}${(invoice.amount || 0).toLocaleString()}).`,
+      type: 'success',
+      link: '/app/invoices',
+      recipientRole: 'finance',
+      user: invoice.uploadedBy || null,
     })
+  } catch (err) {
+    console.warn('[Notification Error]:', err.message)
   }
 
   return { invoice, log }
@@ -60,13 +73,24 @@ export const rejectInvoice = async (invoiceId, userId, comment = '') => {
     comment: comment || 'Invoice rejected by manager',
   })
 
-  // Create Notification for the uploader
-  if (invoice.uploadedBy) {
+  // Create Notification specifically for Finance users with Manager name
+  try {
+    let managerName = 'Manager'
+    if (userId) {
+      const manager = await User.findById(userId)
+      if (manager?.name) managerName = manager.name
+    }
+
     await Notification.create({
       title: 'Invoice Rejected',
-      message: `Invoice ${invoice.invoiceNumber} was rejected. Reason: ${comment || 'No comment provided'}`,
-      user: invoice.uploadedBy,
+      message: `${managerName} rejected Invoice #${invoice.invoiceNumber} from ${invoice.vendorName || 'Vendor'}.${comment ? ` Reason: ${comment}` : ''}`,
+      type: 'danger',
+      link: '/app/invoices',
+      recipientRole: 'finance',
+      user: invoice.uploadedBy || null,
     })
+  } catch (err) {
+    console.warn('[Notification Error]:', err.message)
   }
 
   return { invoice, log }

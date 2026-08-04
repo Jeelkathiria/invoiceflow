@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { FileText, ArrowRight, ExternalLink, AlertTriangle } from 'lucide-react'
+import { formatCurrency } from '../../utils/formatCurrency'
 
 const statusBadges = {
   Pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -14,7 +15,7 @@ export function RecentUploads({ liveInvoices = [] }) {
         id: inv._id,
         invoice: inv.invoiceNumber || 'INV-001',
         vendor: inv.vendorName || 'Unknown Vendor',
-        amount: `₹${(inv.amount || inv.totalAmount || 0).toLocaleString('en-IN')}`,
+        amount: formatCurrency(inv.amount || inv.totalAmount || 0, inv.currency),
         status: inv.status || 'Pending',
         uploaded: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : 'Today',
         duplicate: Boolean(inv.duplicate),

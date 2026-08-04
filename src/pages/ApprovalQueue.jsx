@@ -19,6 +19,8 @@ import {
 
 const ITEMS_PER_PAGE = 12
 
+import { formatCurrency } from '../utils/formatCurrency'
+
 export function ApprovalQueue() {
   const { user } = useAuth()
   const userRole = (user?.role || '').toLowerCase()
@@ -50,10 +52,11 @@ export function ApprovalQueue() {
           vendorName: inv.vendorName || 'Unknown Vendor',
           category: inv.category || 'General Invoices',
           submittedBy: inv.uploadedBy?.name || 'Finance Executive',
-          invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '2026-08-01',
-          dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '2026-08-10',
+          invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '-',
+          dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-',
           totalAmount: inv.amount || inv.totalAmount || 0,
           amount: inv.amount || inv.totalAmount || 0,
+          currency: inv.currency || 'INR',
           subtotal: inv.subtotal || 0,
           gst: inv.gst || 0,
           priority: inv.amount > 50000 ? 'High' : 'Normal',
@@ -261,7 +264,7 @@ export function ApprovalQueue() {
                   </td>
                   <td className="py-3 px-4 text-slate-600 font-medium">{item.submittedBy}</td>
                   <td className="py-3 px-4 text-right font-black text-slate-900">
-                    ₹{(item.totalAmount || item.amount || 0).toLocaleString()}
+                    {formatCurrency(item.totalAmount || item.amount || 0, item.currency)}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
