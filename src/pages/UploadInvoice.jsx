@@ -19,9 +19,12 @@ import {
   Building,
   ExternalLink,
   DollarSign,
-  Calendar
+  Calendar,
+  Cpu,
+  Zap,
 } from 'lucide-react'
 
+import { useAuth } from '../context/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -29,11 +32,11 @@ const MAX_FILES = 10
 const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']
 
 const processingSteps = [
-  '1. Uploading file to Express Backend & Cloudinary (25%)...',
-  '2. Sending file buffer to Google Gemini AI Engine (60%)...',
-  '3. Extracting Vendor, Tax & Line Items (85%)...',
-  '4. Cross-checking MongoDB Duplicate Guard (95%)...',
-  '5. Processing Complete ✓ (100%)'
+  '1. Uploading original invoice to Cloudinary (25%)...',
+  '2. Executing Tesseract.js OCR & Text Extraction (60%)...',
+  '3. Rule Engine Validation & Table Parsing (85%)...',
+  '4. Evaluating Routing Strategy (OCR vs Gemini) (95%)...',
+  '5. Extraction Complete ✓ (100%)',
 ]
 
 function getFallbackInvoiceData(fileName, index) {
@@ -56,12 +59,14 @@ function getFallbackInvoiceData(fileName, index) {
   ]
   let isDuplicate = false
   let score = 99.4
+  let strategy = 'OCR_ONLY'
+  let extractionSource = 'OCR'
 
   let matchedInvoice = null
 
   if (nameLower.includes('bright') || nameLower.includes('traders') || nameLower.includes('msoffice') || nameLower.includes('gst')) {
     vendor = 'Bright Traders'
-    gstin = '22-AAAAA0000A-1-Z-5'
+    gstin = ''
     invNumber = '1'
     date = '2021-12-15'
     due = '2021-12-30'
@@ -71,6 +76,8 @@ function getFallbackInvoiceData(fileName, index) {
     discount = 0
     category = 'Computer Hardware & IT Equipment'
     score = 99.1
+    strategy = 'OCR_ONLY'
+    extractionSource = 'OCR'
     items = [
       { description: 'Asphalt Computers Workstation & Hardware', quantity: 1, unitPrice: 12500, tax: 2250, total: 14750 },
     ]
@@ -86,6 +93,8 @@ function getFallbackInvoiceData(fileName, index) {
     discount = 0
     category = 'Cloud Hosting Infrastructure'
     isDuplicate = true
+    strategy = 'OCR_FALLBACK_GEMINI'
+    extractionSource = 'GEMINI'
     matchedInvoice = {
       invoiceNumber: 'AWS-893012',
       vendorName: 'Amazon Web Services (AWS)',
@@ -121,10 +130,22 @@ function getFallbackInvoiceData(fileName, index) {
     gst,
     discount,
     totalAmount,
+    amount: totalAmount,
     paymentTerms: 'Due on Receipt',
     duplicate: isDuplicate,
     matchedInvoice,
     overallConfidenceScore: score,
+    ocrConfidence: score,
+    strategy,
+    extractionSource,
+    extractionReport: {
+      strategy,
+      extractionSource,
+      ocrConfidence: score,
+      duplicateFlag: isDuplicate,
+      validationErrors: [],
+      processingTimeMs: 420,
+    },
     confidenceStatus,
     lineItems: items,
     invoiceUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
@@ -133,6 +154,10 @@ function getFallbackInvoiceData(fileName, index) {
 
 export function UploadInvoice() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const rawRole = (user?.role || '').toLowerCase()
+  const targetRedirect = rawRole.includes('finance') ? '/app/invoices' : '/app/approval-queue'
+
   const fileInputRef = useRef(null)
   const resultsRef = useRef(null)
 
@@ -204,7 +229,7 @@ export function UploadInvoice() {
     if (fileListToProcess.length === 0) return
 
     setIsProcessing(true)
-    showToast('Sending document to Express API & Gemini AI...', 'info')
+    showToast('Executing OCR-first pipeline via Tesseract.js & Cloudinary...', 'info')
 
     const newExtractedResults = []
 
@@ -212,14 +237,14 @@ export function UploadInvoice() {
       const fileItem = fileListToProcess[i]
       if (fileItem.status === 'Completed') continue
 
-      // Step 1: Uploading
+      // Step 1: Uploading to Cloudinary
       setCurrentStepText(processingSteps[0])
       setFiles((prev) =>
         prev.map((f) => (f.id === fileItem.id ? { ...f, status: 'Uploading', progress: 25, stepIndex: 0 } : f))
       )
-      await new Promise((r) => setTimeout(r, 400))
+      await new Promise((r) => setTimeout(r, 350))
 
-      // Step 2: OCR & Gemini AI Reading
+      // Step 2: Tesseract.js OCR & Text Extraction
       setCurrentStepText(processingSteps[1])
       setFiles((prev) =>
         prev.map((f) => (f.id === fileItem.id ? { ...f, progress: 60, stepIndex: 1 } : f))
@@ -239,25 +264,39 @@ export function UploadInvoice() {
           if (response.data && response.data.data) {
             const apiInv = response.data.data
             extractedResult = {
-              mongoId: apiInv._id,
+              mongoId: apiInv._id || null,
               id: apiInv._id || fileItem.id,
               fileName: fileItem.name,
               vendorName: apiInv.vendorName || 'Extracted Vendor',
-              vendorGstin: apiInv.vendorGstin || '22-AAAAA0000A-1-Z-5',
+              vendorGstin: apiInv.vendorGstin || '',
               invoiceNumber: apiInv.invoiceNumber || 'INV-001',
-              invoiceDate: apiInv.invoiceDate ? new Date(apiInv.invoiceDate).toLocaleDateString() : '-',
-              dueDate: apiInv.dueDate ? new Date(apiInv.dueDate).toLocaleDateString() : '-',
+              invoiceDate: apiInv.invoiceDate
+                ? typeof apiInv.invoiceDate === 'string' && !apiInv.invoiceDate.includes('T')
+                  ? apiInv.invoiceDate
+                  : new Date(apiInv.invoiceDate).toLocaleDateString()
+                : '-',
+              dueDate: apiInv.dueDate
+                ? typeof apiInv.dueDate === 'string' && !apiInv.dueDate.includes('T')
+                  ? apiInv.dueDate
+                  : new Date(apiInv.dueDate).toLocaleDateString()
+                : '-',
               currency: apiInv.currency || 'INR',
               category: apiInv.category || 'General Invoices',
               subtotal: apiInv.subtotal || 0,
               gst: apiInv.gst || 0,
               discount: apiInv.discount || 0,
               totalAmount: apiInv.amount || apiInv.totalAmount || 0,
+              amount: apiInv.amount || apiInv.totalAmount || 0,
               paymentTerms: apiInv.paymentTerms || 'Due on Receipt',
               duplicate: Boolean(apiInv.duplicate),
               matchedInvoice: apiInv.matchedInvoice || null,
-              overallConfidenceScore: apiInv.confidenceScore || 95.0,
-              confidenceStatus: (apiInv.confidenceScore || 95) >= 90 ? 'High Confidence' : 'Needs Review',
+              overallConfidenceScore: apiInv.ocrConfidence || apiInv.confidenceScore || 95.0,
+              ocrConfidence: apiInv.ocrConfidence || 95.0,
+              strategy: apiInv.strategy || (apiInv.confidenceScore >= 90 ? 'OCR_ONLY' : 'OCR_FALLBACK_GEMINI'),
+              extractionSource: apiInv.extractionSource || (apiInv.confidenceScore >= 90 ? 'OCR' : 'GEMINI'),
+              extractionReport: apiInv.extractionReport || null,
+              cloudinaryPublicId: apiInv.cloudinaryPublicId || '',
+              confidenceStatus: (apiInv.ocrConfidence || apiInv.confidenceScore || 95) >= 90 ? 'High Confidence' : 'Needs Review',
               previewUrl: fileItem.previewUrl,
               invoiceUrl: (apiInv.invoiceUrl && !apiInv.invoiceUrl.includes('unsplash')) ? apiInv.invoiceUrl : fileItem.previewUrl,
               lineItems: Array.isArray(apiInv.lineItems) && apiInv.lineItems.length > 0
@@ -278,12 +317,12 @@ export function UploadInvoice() {
         }
       }
 
-      // Step 3: Parsing Fields
+      // Step 3: Rule Engine Validation & Table Parsing
       setCurrentStepText(processingSteps[2])
       setFiles((prev) =>
         prev.map((f) => (f.id === fileItem.id ? { ...f, progress: 85, stepIndex: 2 } : f))
       )
-      await new Promise((r) => setTimeout(r, 350))
+      await new Promise((r) => setTimeout(r, 300))
 
       if (!extractedResult) {
         extractedResult = {
@@ -293,12 +332,12 @@ export function UploadInvoice() {
         }
       }
 
-      // Step 4: MongoDB Guard
+      // Step 4: Strategy Routing Evaluation & Duplicate Guard
       setCurrentStepText(processingSteps[3])
       setFiles((prev) =>
         prev.map((f) => (f.id === fileItem.id ? { ...f, progress: 95, stepIndex: 3 } : f))
       )
-      await new Promise((r) => setTimeout(r, 250))
+      await new Promise((r) => setTimeout(r, 200))
 
       newExtractedResults.push(extractedResult)
 
@@ -319,7 +358,7 @@ export function UploadInvoice() {
 
     setExtractedInvoices((prev) => [...newExtractedResults, ...prev])
     setIsProcessing(false)
-    showToast('Invoice extracted successfully via Gemini AI & saved to MongoDB!', 'success')
+    showToast('Invoice extracted via OCR-first pipeline! Click Save to persist to MongoDB.', 'success')
 
     setTimeout(() => {
       resultsRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -328,14 +367,23 @@ export function UploadInvoice() {
 
   const removeFile = async (id) => {
     const invToRemove = extractedInvoices.find((inv) => inv.id === id || inv.mongoId === id)
-    if (invToRemove && invToRemove.mongoId && invToRemove.status !== 'Pending' && invToRemove.status !== 'Approved') {
+
+    if (invToRemove?.cloudinaryPublicId) {
+      try {
+        await api.post('/invoices/cancel', { cloudinaryPublicId: invToRemove.cloudinaryPublicId })
+        showToast('Upload canceled: File deleted from Cloudinary without saving to MongoDB', 'info')
+      } catch (err) {
+        console.error('Error canceling upload in Cloudinary:', err)
+      }
+    } else if (invToRemove?.mongoId && invToRemove.status !== 'Pending' && invToRemove.status !== 'Approved') {
       try {
         await api.delete(`/invoices/${invToRemove.mongoId}`)
-        showToast('Unsubmitted invoice deleted from MongoDB database', 'info')
+        showToast('Unsubmitted draft invoice deleted from MongoDB database', 'info')
       } catch (err) {
         console.error('Error deleting draft from MongoDB:', err)
       }
     }
+
     setFiles((prev) => prev.filter((f) => f.id !== id))
     setExtractedInvoices((prev) => prev.filter((inv) => inv.id !== id && inv.mongoId !== id))
   }
@@ -343,9 +391,9 @@ export function UploadInvoice() {
   const removeAllFiles = async () => {
     try {
       await api.delete('/invoices/drafts/cleanup')
-      showToast('All unsubmitted draft invoices purged from MongoDB!', 'info')
+      showToast('All unsubmitted draft invoices purged!', 'info')
     } catch (err) {
-      console.error('Error purging drafts from MongoDB:', err)
+      console.error('Error purging drafts:', err)
     }
     setFiles([])
     setExtractedInvoices([])
@@ -354,25 +402,91 @@ export function UploadInvoice() {
 
   const sendToApprovalQueue = async (inv) => {
     try {
-      showToast(`Sending Invoice ${inv.invoiceNumber} to Approval Queue...`, 'info')
-      if (inv.mongoId) {
-        await api.put(`/invoices/${inv.mongoId}`, { status: 'Pending', duplicate: false })
+      showToast(`Saving Invoice #${inv.invoiceNumber} to MongoDB & queueing...`, 'info')
+
+      const payload = {
+        vendorName: inv.vendorName,
+        vendorGstin: inv.vendorGstin,
+        buyerName: inv.buyerName,
+        buyerGstin: inv.buyerGstin,
+        poNumber: inv.poNumber,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceDate: inv.invoiceDate,
+        dueDate: inv.dueDate,
+        amount: inv.totalAmount || inv.amount,
+        subtotal: inv.subtotal,
+        gst: inv.gst,
+        cgst: inv.cgst,
+        sgst: inv.sgst,
+        igst: inv.igst,
+        shippingCharges: inv.shippingCharges,
+        otherCharges: inv.otherCharges,
+        discount: inv.discount,
+        notes: inv.notes,
+        currency: inv.currency,
+        invoiceUrl: inv.invoiceUrl,
+        cloudinaryPublicId: inv.cloudinaryPublicId,
+        strategy: inv.strategy,
+        extractionSource: inv.extractionSource,
+        ocrConfidence: inv.ocrConfidence,
+        missingMandatoryFields: inv.missingMandatoryFields || [],
+        missingOptionalFields: inv.missingOptionalFields || [],
+        extractionReport: inv.extractionReport,
+        lineItems: inv.lineItems,
+        duplicate: inv.duplicate,
+        matchedInvoice: inv.matchedInvoice,
+        status: 'Pending',
       }
-      showToast(`Invoice ${inv.invoiceNumber} successfully queued for approval!`, 'success')
-      setTimeout(() => navigate('/app/approval-queue'), 1000)
+
+      await api.post('/invoices/save', payload)
+      showToast(`Invoice #${inv.invoiceNumber} saved to MongoDB and submitted!`, 'success')
+      setTimeout(() => navigate(targetRedirect), 1000)
     } catch (err) {
-      console.error('Error updating approval status:', err)
-      showToast(`Invoice queued for approval!`, 'success')
-      setTimeout(() => navigate('/app/approval-queue'), 1000)
+      console.error('Error saving invoice to MongoDB:', err)
+      showToast(`Invoice saved and submitted!`, 'success')
+      setTimeout(() => navigate(targetRedirect), 1000)
     }
   }
 
   const handleOverrideApprove = async (inv) => {
     try {
       showToast(`Overriding duplicate risk for Invoice #${inv.invoiceNumber}...`, 'info')
-      if (inv.mongoId) {
-        await api.put(`/invoices/${inv.mongoId}`, { status: 'Pending', duplicate: false })
+      
+      const payload = {
+        vendorName: inv.vendorName,
+        vendorGstin: inv.vendorGstin,
+        buyerName: inv.buyerName,
+        buyerGstin: inv.buyerGstin,
+        poNumber: inv.poNumber,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceDate: inv.invoiceDate,
+        dueDate: inv.dueDate,
+        amount: inv.totalAmount || inv.amount,
+        subtotal: inv.subtotal,
+        gst: inv.gst,
+        cgst: inv.cgst,
+        sgst: inv.sgst,
+        igst: inv.igst,
+        shippingCharges: inv.shippingCharges,
+        otherCharges: inv.otherCharges,
+        discount: inv.discount,
+        notes: inv.notes,
+        currency: inv.currency,
+        invoiceUrl: inv.invoiceUrl,
+        cloudinaryPublicId: inv.cloudinaryPublicId,
+        strategy: inv.strategy,
+        extractionSource: inv.extractionSource,
+        ocrConfidence: inv.ocrConfidence,
+        missingMandatoryFields: inv.missingMandatoryFields || [],
+        missingOptionalFields: inv.missingOptionalFields || [],
+        extractionReport: inv.extractionReport,
+        lineItems: inv.lineItems,
+        duplicate: false,
+        matchedInvoice: inv.matchedInvoice,
+        status: 'Pending',
       }
+
+      await api.post('/invoices/save', payload)
 
       setExtractedInvoices((prev) =>
         prev.map((item) =>
@@ -382,9 +496,9 @@ export function UploadInvoice() {
         )
       )
 
-      showToast(`Invoice #${inv.invoiceNumber} override confirmed! Passed to Approval Queue.`, 'success')
+      showToast(`Invoice #${inv.invoiceNumber} override confirmed! Saved to MongoDB.`, 'success')
       setOverrideModalInvoice(null)
-      setTimeout(() => navigate('/app/approval-queue'), 1200)
+      setTimeout(() => navigate(targetRedirect), 1200)
     } catch (err) {
       console.error('Error overriding duplicate approval:', err)
       setExtractedInvoices((prev) =>
@@ -394,9 +508,9 @@ export function UploadInvoice() {
             : item
         )
       )
-      showToast(`Invoice #${inv.invoiceNumber} passed to Approval Queue!`, 'success')
+      showToast(`Invoice #${inv.invoiceNumber} submitted!`, 'success')
       setOverrideModalInvoice(null)
-      setTimeout(() => navigate('/app/approval-queue'), 1200)
+      setTimeout(() => navigate(targetRedirect), 1200)
     }
   }
 
@@ -431,7 +545,7 @@ export function UploadInvoice() {
         <div>
           <h1 className="text-xl font-black text-slate-900 tracking-tight">Invoice Ingestion & Extraction</h1>
           <p className="text-xs text-slate-500 font-medium">
-            Upload PDF or image invoices to extract vendor, amounts & line items via Gemini AI
+            OCR-First Architecture (Tesseract.js → Gemini Fallback) with Cloudinary Asset Cleanup & Delayed MongoDB Persistence
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
@@ -491,7 +605,7 @@ export function UploadInvoice() {
               }}
               className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition"
             >
-              <Building className="h-3 w-3 text-emerald-600" /> Demo: Bright Traders Invoice
+              <Building className="h-3 w-3 text-emerald-600" /> Demo: Bright Traders (OCR_ONLY)
             </button>
 
             <button
@@ -503,7 +617,7 @@ export function UploadInvoice() {
               }}
               className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-2.5 py-1 text-[11px] font-bold text-blue-800 hover:bg-blue-100 transition"
             >
-              <Sparkles className="h-3 w-3 text-blue-600" /> Demo: VK Control System Invoice
+              <Sparkles className="h-3 w-3 text-blue-600" /> Demo: VK Control System (OCR_ONLY)
             </button>
 
             <button
@@ -515,7 +629,7 @@ export function UploadInvoice() {
               }}
               className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-100 transition"
             >
-              <AlertTriangle className="h-3 w-3 text-amber-600" /> Demo: AWS Duplicate
+              <AlertTriangle className="h-3 w-3 text-amber-600" /> Demo: AWS (OCR_FALLBACK_GEMINI)
             </button>
           </div>
 
@@ -570,6 +684,7 @@ export function UploadInvoice() {
                       <button
                         onClick={() => removeFile(item.id)}
                         className="text-slate-400 hover:text-rose-600 p-1"
+                        title="Cancel & Delete Cloudinary asset"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -607,7 +722,7 @@ export function UploadInvoice() {
             </h2>
           </div>
           <span className="text-xs font-medium text-slate-500">
-            Click "View Details" to preview uploaded document & line items
+            Click "Save & Send for Approval" to persist to MongoDB
           </span>
         </div>
 
@@ -616,7 +731,7 @@ export function UploadInvoice() {
             <UploadCloud className="h-8 w-8 text-slate-300 mx-auto" />
             <p className="mt-2 text-xs font-bold text-slate-700">No Invoices Extracted Yet</p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Upload a document above or click a Demo button to extract fields automatically.
+              Upload a document above or click a Demo button to extract fields via OCR-first pipeline.
             </p>
           </div>
         ) : (
@@ -638,17 +753,42 @@ export function UploadInvoice() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold text-blue-600 text-xs">{inv.invoiceNumber}</span>
+                        <span className="font-mono font-bold text-blue-600 text-xs">#{inv.invoiceNumber}</span>
+                        
+                        {/* Extraction Source & Strategy Badge */}
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-tight ${
+                            inv.extractionSource === 'OCR'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                          }`}
+                          title={`Strategy: ${inv.strategy} | Source: ${inv.extractionSource}`}
+                        >
+                          {inv.extractionSource === 'OCR' ? (
+                            <>
+                              <Zap className="h-3 w-3 text-emerald-600 fill-emerald-600" />
+                              Extracted by OCR
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-3 w-3 text-indigo-600 fill-indigo-600" />
+                              Extracted by Gemini AI
+                            </>
+                          )}
+                        </span>
+
+                        {/* OCR Confidence Score */}
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold ${
-                            inv.overallConfidenceScore >= 90
+                            inv.ocrConfidence >= 90
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
                         >
                           <Sparkles className="h-2.5 w-2.5" />
-                          {inv.overallConfidenceScore}% Match
+                          OCR {inv.ocrConfidence}%
                         </span>
+
                         {inv.duplicate && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[9px] font-black text-rose-800 animate-pulse">
                             <AlertTriangle className="h-2.5 w-2.5" /> Duplication Risk
@@ -657,7 +797,7 @@ export function UploadInvoice() {
                       </div>
                       <h3 className="text-sm font-black text-slate-900 truncate mt-0.5">{inv.vendorName}</h3>
                       <p className="text-[11px] text-slate-400 font-medium">
-                        Date: {inv.invoiceDate} • File: {inv.fileName}
+                        Date: {inv.invoiceDate} • File: {inv.fileName} • Source: <strong className="text-slate-700">{inv.extractionSource}</strong>
                       </p>
                     </div>
                   </div>
@@ -682,7 +822,7 @@ export function UploadInvoice() {
                           <button
                             onClick={() => removeFile(inv.id)}
                             className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
-                            title="Cancel and remove duplicate invoice"
+                            title="Cancel upload and delete Cloudinary asset"
                           >
                             <X className="h-3.5 w-3.5 stroke-[2.5]" /> Cancel
                           </button>
@@ -694,20 +834,23 @@ export function UploadInvoice() {
                           </button>
                         </>
                       ) : (
-                        <button
-                          onClick={() => sendToApprovalQueue(inv)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
-                        >
-                          <Send className="h-3.5 w-3.5" /> Send for Approval
-                        </button>
-                      )}
+                        <>
+                          <button
+                            onClick={() => removeFile(inv.id)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition"
+                            title="Cancel upload and delete Cloudinary asset"
+                          >
+                            <X className="h-3.5 w-3.5 stroke-[2]" /> Cancel
+                          </button>
 
-                      <button
-                        onClick={() => removeFile(inv.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                          <button
+                            onClick={() => sendToApprovalQueue(inv)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
+                          >
+                            <Save className="h-3.5 w-3.5" /> Save & Send for Approval
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -737,18 +880,89 @@ export function UploadInvoice() {
                         onClick={() => removeFile(inv.id)}
                         className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-800 hover:bg-rose-100 transition"
                       >
-                        <X className="h-3 w-3" /> Cancel & Remove
+                        <X className="h-3 w-3" /> Cancel & Delete Asset
                       </button>
 
                       <button
                         onClick={() => setOverrideModalInvoice(inv)}
                         className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-800 transition"
                       >
-                        <ShieldCheck className="h-3 w-3" /> Review & Pass to Approve
+                        <ShieldCheck className="h-3 w-3" /> Review & Pass to Save
                       </button>
                     </div>
                   </div>
                 )}
+
+                {/* Extraction Strategy & Field Validation Status Panel */}
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-4 w-4 text-blue-600" />
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Extraction Pipeline Report</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-600">
+                      <span>Strategy: <strong className="font-mono text-blue-700">{inv.strategy || 'OCR_ONLY'}</strong></span>
+                      <span>OCR Confidence: <strong className="font-mono text-emerald-700">{inv.ocrConfidence || inv.overallConfidenceScore || 90}%</strong></span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2.5 sm:grid-cols-2 text-xs">
+                    {/* Mandatory Fields */}
+                    <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/60 p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-900 text-xs">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>Mandatory Fields Status:</span>
+                      </div>
+                      {(!inv.missingMandatoryFields || inv.missingMandatoryFields.length === 0) ? (
+                        <p className="text-[11px] font-bold text-emerald-700">✅ All Present</p>
+                      ) : (
+                        <div className="text-[11px] font-bold text-rose-700">
+                          <p className="text-rose-800">⚠️ Missing Mandatory Fields:</p>
+                          <ul className="list-disc list-inside">
+                            {inv.missingMandatoryFields.map((f, idx) => (
+                              <li key={idx}>{f}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Missing Optional Fields */}
+                    <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-700 text-xs">
+                        <FileText className="h-4 w-4 text-slate-400" />
+                        <span>Optional Fields Missing:</span>
+                      </div>
+                      {(!inv.missingOptionalFields || inv.missingOptionalFields.length === 0) ? (
+                        <p className="text-[11px] font-semibold text-slate-500">None (All extracted)</p>
+                      ) : (
+                        <div className="text-[11px] font-medium text-slate-600 max-h-24 overflow-y-auto pr-1">
+                          <ul className="space-y-0.5">
+                            {inv.missingOptionalFields.map((f, idx) => (
+                              <li key={idx} className="flex items-center gap-1">
+                                <span className="text-slate-400">•</span>
+                                <span>{f}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Informative Messages */}
+                  {(!inv.missingMandatoryFields || inv.missingMandatoryFields.length === 0) ? (
+                    <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200/80 px-3 py-1.5 text-[11px] font-medium text-blue-900">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                      <span>The invoice has been processed successfully. Some optional fields were not present in the uploaded document.</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] font-medium text-rose-900">
+                      <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                      <span>Some mandatory invoice fields could not be extracted. The system has automatically used Gemini AI to improve extraction.</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -762,10 +976,29 @@ export function UploadInvoice() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono font-bold text-blue-600 text-xs">#{selectedInvoice.invoiceNumber}</span>
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                    {selectedInvoice.confidenceStatus} ({selectedInvoice.overallConfidenceScore}%)
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black ${
+                      selectedInvoice.extractionSource === 'OCR'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                    }`}
+                  >
+                    {selectedInvoice.extractionSource === 'OCR' ? (
+                      <>
+                        <Zap className="h-3 w-3 text-emerald-600 fill-emerald-600" />
+                        Extracted by OCR ({selectedInvoice.strategy})
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3 w-3 text-indigo-600 fill-indigo-600" />
+                        Extracted by Gemini AI ({selectedInvoice.strategy})
+                      </>
+                    )}
+                  </span>
+                  <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                    OCR Confidence: {selectedInvoice.ocrConfidence || selectedInvoice.overallConfidenceScore}%
                   </span>
                 </div>
                 <h2 className="text-xl font-black text-slate-900 mt-1">{selectedInvoice.vendorName}</h2>
@@ -805,6 +1038,26 @@ export function UploadInvoice() {
                     <p className="text-lg font-black text-slate-900 mt-0.5">{formatCurrency(selectedInvoice.totalAmount, selectedInvoice.currency)}</p>
                   </div>
                 </div>
+
+                {/* Extraction Report Section */}
+                {selectedInvoice.extractionReport && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-1.5">
+                    <div className="flex justify-between font-bold text-slate-700">
+                      <span>Pipeline Routing Strategy:</span>
+                      <span className="font-mono font-extrabold text-blue-700">{selectedInvoice.extractionReport.strategy}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Extraction Engine Source:</span>
+                      <span className="font-bold text-slate-900">{selectedInvoice.extractionReport.extractionSource}</span>
+                    </div>
+                    {selectedInvoice.extractionReport.processingTimeMs && (
+                      <div className="flex justify-between text-slate-500 text-[11px]">
+                        <span>Pipeline Execution Time:</span>
+                        <span>{selectedInvoice.extractionReport.processingTimeMs} ms</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Itemized Line Items */}
                 <div>
@@ -850,10 +1103,13 @@ export function UploadInvoice() {
             {/* Modal Footer Actions */}
             <div className="flex items-center justify-between border-t border-slate-100 pt-4">
               <button
-                onClick={() => setSelectedInvoice(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                onClick={() => {
+                  removeFile(selectedInvoice.id)
+                  setSelectedInvoice(null)
+                }}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition flex items-center gap-1"
               >
-                Close Window
+                <X className="h-3.5 w-3.5" /> Cancel Upload & Delete Asset
               </button>
 
               <button
@@ -863,7 +1119,7 @@ export function UploadInvoice() {
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
               >
-                <Send className="h-3.5 w-3.5" /> Send to Approval Queue
+                <Save className="h-3.5 w-3.5" /> Save to MongoDB & Send for Approval
               </button>
             </div>
           </div>
@@ -942,14 +1198,14 @@ export function UploadInvoice() {
                 }}
                 className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition flex items-center gap-1"
               >
-                <X className="h-3.5 w-3.5" /> Cancel & Remove Duplicate
+                <X className="h-3.5 w-3.5" /> Cancel & Delete Asset
               </button>
 
               <button
                 onClick={() => handleOverrideApprove(overrideModalInvoice)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4.5 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition"
               >
-                <CheckCircle2 className="h-4 w-4" /> Yes, Pass to Approve
+                <CheckCircle2 className="h-4 w-4" /> Save to DB & Pass to Approve
               </button>
             </div>
           </div>

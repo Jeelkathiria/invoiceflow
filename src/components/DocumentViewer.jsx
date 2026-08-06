@@ -4,7 +4,7 @@ import { FileText, ExternalLink, Download } from 'lucide-react'
 export function generateInvoiceSVG(invoice) {
   const invNumber = invoice?.invoiceNumber || invoice?.id || 'INV-2026-001'
   const vendor = invoice?.vendorName || invoice?.vendor || 'Vendor Business Ltd'
-  const gstin = invoice?.vendorGstin || '22-AAAAA0000A-1-Z-5'
+  const gstin = invoice?.vendorGstin || ''
   const date = invoice?.invoiceDate || '-'
   const due = (invoice?.dueDate && invoice.dueDate !== 'null' && invoice.dueDate !== 'undefined' && invoice.dueDate !== '-') ? (typeof invoice.dueDate === 'string' && !invoice.dueDate.includes('T') ? invoice.dueDate : new Date(invoice.dueDate).toLocaleDateString()) : '-'
   const sym = (invoice?.currency === 'USD' || invoice?.currency === '$') ? '$' : (invoice?.currency === 'EUR' || invoice?.currency === '€' ? '€' : (invoice?.currency === 'GBP' || invoice?.currency === '£' ? '£' : '₹'))
@@ -47,7 +47,7 @@ export function generateInvoiceSVG(invoice) {
       
       <!-- Vendor Info Header -->
       <text x="40" y="52" font-size="18" font-weight="900" fill="#0f172a">${vendor.replace(/&/g, '&amp;')}</text>
-      <text x="40" y="70" font-size="10" font-weight="700" fill="#64748b">OFFICIAL TAX INVOICE • GSTIN: ${gstin}</text>
+      <text x="40" y="70" font-size="10" font-weight="700" fill="#64748b">OFFICIAL TAX INVOICE${gstin ? ` • GSTIN: ${gstin}` : ''}</text>
       
       <text x="560" y="48" font-size="15" font-weight="800" fill="#2563eb" text-anchor="end">#${invNumber}</text>
       <text x="560" y="66" font-size="10" fill="#64748b" text-anchor="end">Date: ${date}</text>

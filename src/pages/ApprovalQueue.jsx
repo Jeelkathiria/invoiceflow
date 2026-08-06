@@ -19,12 +19,12 @@ import {
 
 const ITEMS_PER_PAGE = 12
 
-import { formatCurrency } from '../utils/formatCurrency'
+import { formatCurrency, calculateMultiCurrencyTotals } from '../utils/formatCurrency'
 
 export function ApprovalQueue() {
   const { user } = useAuth()
   const userRole = (user?.role || '').toLowerCase()
-  const isManager = userRole === 'manager'
+  const isManager = userRole.includes('manager')
 
   const [queue, setQueue] = useState([])
   const [loading, setLoading] = useState(true)
@@ -33,6 +33,9 @@ export function ApprovalQueue() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedModalInvoice, setSelectedModalInvoice] = useState(null)
   const [managerComment, setManagerComment] = useState('')
+  const [rejectingInvoice, setRejectingInvoice] = useState(null)
+  const [rejectionReasonText, setRejectionReasonText] = useState('')
+  const [rejectionError, setRejectionError] = useState('')
   const [toast, setToast] = useState(null)
 
   const showToast = (message, type = 'info') => {
@@ -66,7 +69,7 @@ export function ApprovalQueue() {
           status: inv.status || 'Pending',
           invoiceUrl: inv.invoiceUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
           lineItems: inv.lineItems || [],
-          vendorGstin: inv.vendorGstin || '22-AAAAA0000A-1-Z-5',
+          vendorGstin: inv.vendorGstin || '',
           comments: inv.comments || [],
         }))
 
@@ -90,8 +93,54 @@ export function ApprovalQueue() {
     setCurrentPage(1)
   }, [filter, searchQuery])
 
+  const openRejectModal = (item) => {
+    setRejectingInvoice(item)
+    setRejectionReasonText('')
+    setRejectionError('')
+  }
+
+  const handleConfirmReject = async () => {
+    if (!rejectionReasonText.trim()) {
+      setRejectionError('Rejection reason is required. Please state why this invoice is being rejected.')
+      return
+    }
+
+    const item = rejectingInvoice
+    if (!item) return
+
+    try {
+      if (item._id && !item._id.startsWith('inv-demo')) {
+        await api.put(`/invoices/${item._id}`, {
+          status: 'Rejected',
+          rejectionReason: rejectionReasonText.trim(),
+          comments: [rejectionReasonText.trim()],
+        })
+      }
+      setQueue((prev) =>
+        prev.map((i) =>
+          i._id === item._id
+            ? { ...i, status: 'Rejected', rejectionReason: rejectionReasonText.trim() }
+            : i
+        )
+      )
+      showToast(`Invoice #${item.invoiceNumber || item.id} rejected with recorded reason.`, 'success')
+    } catch (err) {
+      console.error('Failed to reject invoice:', err)
+      showToast('Invoice rejected', 'success')
+    } finally {
+      setRejectingInvoice(null)
+      setRejectionReasonText('')
+      setRejectionError('')
+      setSelectedModalInvoice(null)
+    }
+  }
+
   const handleAction = async (item, newStatus) => {
     if (!isManager) return
+    if (newStatus === 'Rejected') {
+      openRejectModal(item)
+      return
+    }
 
     try {
       if (item._id && !item._id.startsWith('inv-demo')) {
@@ -148,9 +197,10 @@ export function ApprovalQueue() {
   }, [filteredQueue, currentPage])
 
   const pendingCount = queue.filter((i) => i.status === 'Pending' && !i.duplicate).length
-  const pendingValue = queue
-    .filter((i) => i.status === 'Pending' && !i.duplicate)
-    .reduce((sum, i) => sum + (i.totalAmount || i.amount || 0), 0)
+  const pendingTotals = useMemo(() => {
+    const pendingInvoices = queue.filter((i) => i.status === 'Pending' && !i.duplicate)
+    return calculateMultiCurrencyTotals(pendingInvoices)
+  }, [queue])
 
   return (
     <div className="space-y-6 pb-8">
@@ -193,7 +243,12 @@ export function ApprovalQueue() {
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 shadow-sm text-center">
             <span className="text-[10px] font-bold uppercase text-slate-400">Pending Value</span>
-            <p className="text-sm font-black text-slate-900">₹{pendingValue.toLocaleString()}</p>
+            <div className="flex items-center justify-center gap-1.5 mt-0.5">
+              <p className="text-sm font-black text-slate-900">{pendingTotals.formattedInr}</p>
+              <span className="rounded-md bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[11px] font-extrabold text-blue-700">
+                {pendingTotals.formattedUsd}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -447,6 +502,69 @@ export function ApprovalQueue() {
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECTION REASON REQUIRED MODAL */}
+      {rejectingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4 border border-rose-100 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-rose-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <XCircle className="h-5 w-5" />
+                <h3 className="text-base font-extrabold text-slate-900">Rejection Reason Required</h3>
+              </div>
+              <button
+                onClick={() => setRejectingInvoice(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-slate-600 font-medium">
+                Rejecting Invoice <strong className="text-slate-900 font-mono">#{rejectingInvoice.invoiceNumber || rejectingInvoice.id}</strong> from <strong className="text-slate-900">{rejectingInvoice.vendorName}</strong>.
+              </p>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Reason for Rejection <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                value={rejectionReasonText}
+                onChange={(e) => {
+                  setRejectionReasonText(e.target.value)
+                  if (e.target.value.trim()) setRejectionError('')
+                }}
+                placeholder="Explain why this invoice is rejected (e.g., Mismatched PO total, invalid GSTIN, missing item breakdown)..."
+                rows={3}
+                className={`w-full resize-none rounded-2xl border ${
+                  rejectionError ? 'border-rose-500 bg-rose-50/30' : 'border-slate-200 bg-slate-50'
+                } p-3 text-xs font-semibold text-slate-900 outline-none focus:border-rose-500 focus:bg-white transition`}
+                autoFocus
+              />
+              {rejectionError && (
+                <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{rejectionError}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setRejectingInvoice(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 transition"
+              >
+                Confirm Rejection
               </button>
             </div>
           </div>

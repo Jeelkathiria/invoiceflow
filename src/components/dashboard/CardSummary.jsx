@@ -1,6 +1,6 @@
 import { TrendingUp, TrendingDown } from 'lucide-react'
 
-export function CardSummary({ title, value, change, trend = 'up', icon: Icon, color = 'blue', description }) {
+export function CardSummary({ title, value, subValue, change, trend = 'up', icon: Icon, color = 'blue', description }) {
   const colorMap = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
     green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
@@ -30,9 +30,16 @@ export function CardSummary({ title, value, change, trend = 'up', icon: Icon, co
 
       <div className="mt-4">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</p>
-        <h3 className="mt-1 text-2xl font-black text-slate-900">{value}</h3>
+        <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+          <h3 className="text-2xl font-black text-slate-900">{value}</h3>
+          {subValue && (
+            <span className="text-xs font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+              {subValue}
+            </span>
+          )}
+        </div>
         {description && (
-          <p className="mt-1 text-xs text-slate-500">{description}</p>
+          <p className="mt-1 text-xs font-medium text-slate-500">{description}</p>
         )}
       </div>
     </div>

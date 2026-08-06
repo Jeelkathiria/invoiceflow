@@ -10,13 +10,15 @@ import { ActivityTimeline } from '../components/dashboard/ActivityTimeline'
 import { ExpenseAnalytics } from '../components/dashboard/ExpenseAnalytics'
 import { useAuth } from '../context/AuthContext'
 
+import { calculateMultiCurrencyTotals } from '../utils/formatCurrency'
+
 export function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
   const userRole = (user?.role || 'finance').toLowerCase()
-  const isManager = userRole === 'manager'
-  const isFinance = userRole === 'finance'
+  const isManager = userRole.includes('manager')
+  const isFinance = userRole.includes('finance') || !isManager
 
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
@@ -55,19 +57,16 @@ export function Dashboard() {
 
     const approvedInvoices = submittedInvoices.filter((i) => i.status === 'Approved')
     const approvedCount = approvedInvoices.length
-    const approvedTotal = approvedInvoices.reduce((sum, i) => sum + Number(i.amount || i.totalAmount || 0), 0)
 
     const rejectedInvoices = submittedInvoices.filter((i) => i.status === 'Rejected')
     const rejectedCount = rejectedInvoices.length
 
-    const totalAmount = submittedInvoices.reduce((sum, i) => sum + Number(i.amount || i.totalAmount || 0), 0)
-
-    const formattedApproved = `₹${approvedTotal.toLocaleString('en-IN')}`
-    const formattedTotalAmount = `₹${totalAmount.toLocaleString('en-IN')}`
+    // Multi-currency calculation
+    const approvedTotals = calculateMultiCurrencyTotals(approvedInvoices)
+    const allTotals = calculateMultiCurrencyTotals(submittedInvoices)
 
     if (isManager) {
       // MANAGER DASHBOARD SPECIFIC METRICS:
-      // Pending Approvals, Approved Today, Rejected Today, Total Approval Amount
       return [
         {
           title: 'Pending Approvals',
@@ -98,17 +97,17 @@ export function Dashboard() {
         },
         {
           title: 'Total Approval Amount',
-          value: formattedApproved,
-          change: approvedTotal > 0 ? 'Authorized budget release' : '₹0 cleared amount',
+          value: approvedTotals.formattedInr,
+          subValue: approvedTotals.hasMultipleCurrencies ? approvedTotals.formattedUsd : (approvedTotals.usdTotal > 0 ? approvedTotals.formattedUsd : null),
+          change: approvedTotals.equivalentInr > 0 ? `Total: ${approvedTotals.formattedDual}` : '₹0 cleared amount',
           trend: 'up',
           icon: Sparkles,
           color: 'blue',
-          description: 'Cumulative Cleared Value',
+          description: approvedTotals.hasMultipleCurrencies ? `Equiv: ${approvedTotals.formattedUsd}` : 'Cumulative Cleared Value',
         },
       ]
     } else {
       // FINANCE DASHBOARD SPECIFIC METRICS:
-      // Total Invoices, Pending Approval, Approved, Rejected, Total Invoice Amount
       return [
         {
           title: 'Total Invoices',
@@ -139,16 +138,17 @@ export function Dashboard() {
         },
         {
           title: 'Total Invoice Amount',
-          value: formattedTotalAmount,
-          change: totalAmount > 0 ? 'Cumulative value' : '₹0 invoice value',
+          value: allTotals.formattedInr,
+          subValue: allTotals.hasMultipleCurrencies ? allTotals.formattedUsd : (allTotals.usdTotal > 0 ? allTotals.formattedUsd : null),
+          change: allTotals.equivalentInr > 0 ? `Total: ${allTotals.formattedDual}` : '₹0 invoice value',
           trend: 'up',
           icon: Sparkles,
           color: 'blue',
-          description: 'Total Financial Value',
+          description: allTotals.hasMultipleCurrencies ? `Equiv: ${allTotals.formattedUsd}` : 'Total Financial Value',
         },
       ]
     }
-  }, [invoices, isManager])
+  }, [submittedInvoices, isManager])
 
   return (
     <div className="space-y-6 pb-8">

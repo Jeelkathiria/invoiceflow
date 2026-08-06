@@ -7,9 +7,29 @@ export const uploadInvoice = async (req, res, next) => {
       return errorResponse(res, 400, 'Please attach an invoice document file')
     }
 
+    const extracted = await invoiceService.extractAndAnalyzeInvoice(req.file)
+    return successResponse(res, 200, 'Invoice analyzed via OCR-first pipeline successfully', extracted)
+  } catch (error) {
+    console.error('[Upload Invoice Controller Error]:', error)
+    next(error)
+  }
+}
+
+export const saveInvoice = async (req, res, next) => {
+  try {
     const userId = req.user ? (req.user._id || req.user.id) : null
-    const invoice = await invoiceService.processAndSaveInvoice(req.file, userId)
-    return successResponse(res, 201, 'Invoice uploaded and processed by Gemini AI successfully', invoice)
+    const saved = await invoiceService.saveInvoiceRecord(req.body, userId)
+    return successResponse(res, 201, 'Invoice saved to MongoDB database successfully', saved)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const cancelInvoice = async (req, res, next) => {
+  try {
+    const publicId = req.body.cloudinaryPublicId || req.body.public_id
+    const result = await invoiceService.cancelInvoiceUpload(publicId)
+    return successResponse(res, 200, result.message, result)
   } catch (error) {
     next(error)
   }
@@ -43,6 +63,24 @@ export const getInvoiceById = async (req, res, next) => {
   }
 }
 
+export const getExtractionStrategy = async (req, res, next) => {
+  try {
+    const strategyInfo = await invoiceService.getInvoiceExtractionStrategy(req.params.id)
+    return successResponse(res, 200, 'Invoice extraction strategy info fetched', strategyInfo)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const getLatestExtractionStrategy = async (req, res, next) => {
+  try {
+    const strategyInfo = await invoiceService.getLatestExtractionStrategy()
+    return successResponse(res, 200, 'Latest invoice extraction strategy info fetched', strategyInfo)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const updateInvoice = async (req, res, next) => {
   try {
     const updated = await invoiceService.updateInvoice(req.params.id, req.body)
@@ -65,6 +103,15 @@ export const deleteDraftInvoices = async (req, res, next) => {
   try {
     const userId = req.user ? (req.user._id || req.user.id) : null
     const result = await invoiceService.deleteDraftInvoices(userId)
+    return successResponse(res, 200, result.message, result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const deleteAllInvoices = async (req, res, next) => {
+  try {
+    const result = await invoiceService.deleteAllInvoices()
     return successResponse(res, 200, result.message, result)
   } catch (error) {
     next(error)

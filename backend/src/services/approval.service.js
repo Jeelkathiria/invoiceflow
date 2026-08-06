@@ -61,7 +61,10 @@ export const rejectInvoice = async (invoiceId, userId, comment = '') => {
     throw error
   }
 
+  const reason = (comment || '').trim() || 'No specific reason provided'
+
   invoice.status = 'Rejected'
+  invoice.rejectionReason = reason
   invoice.approvedBy = userId
   await invoice.save()
 
@@ -70,7 +73,7 @@ export const rejectInvoice = async (invoiceId, userId, comment = '') => {
     invoiceId: invoice._id,
     performedBy: userId,
     action: 'Rejected',
-    comment: comment || 'Invoice rejected by manager',
+    comment: reason,
   })
 
   // Create Notification specifically for Finance users with Manager name
@@ -83,9 +86,9 @@ export const rejectInvoice = async (invoiceId, userId, comment = '') => {
 
     await Notification.create({
       title: 'Invoice Rejected',
-      message: `${managerName} rejected Invoice #${invoice.invoiceNumber} from ${invoice.vendorName || 'Vendor'}.${comment ? ` Reason: ${comment}` : ''}`,
+      message: `${managerName} rejected Invoice #${invoice.invoiceNumber}. Reason: "${reason}"`,
       type: 'danger',
-      link: '/app/invoices',
+      link: `/app/invoice/${invoice._id}`,
       recipientRole: 'finance',
       user: invoice.uploadedBy || null,
     })

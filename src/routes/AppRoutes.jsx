@@ -25,9 +25,16 @@ function AuthProtectedRoute({ children }) {
 // Role Guard Component
 function RoleProtectedRoute({ allowedRoles, children }) {
   const { user } = useAuth()
-  const userRole = (user?.role || 'finance').toLowerCase()
+  const rawRole = (user?.role || 'finance').toLowerCase()
 
-  if (!allowedRoles.includes(userRole)) {
+  const isAllowed = allowedRoles.some((allowed) => {
+    const target = allowed.toLowerCase()
+    if (target === 'finance' && rawRole.includes('finance')) return true
+    if (target === 'manager' && rawRole.includes('manager')) return true
+    return rawRole === target
+  })
+
+  if (!isAllowed) {
     return <Navigate to="/app/403" replace />
   }
 

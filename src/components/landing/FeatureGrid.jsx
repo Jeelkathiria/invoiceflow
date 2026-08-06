@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion'
 import {
   Bot,
-  ShieldCheck,
+  Globe,
   Users,
-  Zap,
+  ShieldCheck,
   LineChart,
   History,
   Sparkles,
@@ -11,52 +11,52 @@ import {
 
 const features = [
   {
-    title: 'AI Invoice Extraction',
+    title: 'Hybrid AI Extraction',
     icon: Bot,
-    description: 'Automatically extracts invoice number, vendor, GST, totals, dates and line items using Gemini AI with 99%+ OCR accuracy.',
+    description: 'Tesseract OCR + Gemini 2.5 Flash Vision engine extracts 4 mandatory & 16 extended metadata fields with missing field detection.',
     gradient: 'from-blue-500 via-indigo-500 to-violet-600',
     shadow: 'shadow-indigo-500/10',
-    badge: 'Gemini AI Powered',
+    badge: 'Gemini 2.5 Vision',
   },
   {
-    title: 'Duplicate Detection',
-    icon: ShieldCheck,
-    description: 'Detect duplicate invoices before they enter the approval workflow using multi-attribute cross-checking.',
+    title: 'Multi-Currency Calculation',
+    icon: Globe,
+    description: 'Native calculation and dual conversion across INR (₹), USD ($), EUR (€), and GBP (£) with live exchange equivalence.',
     gradient: 'from-amber-500 via-orange-500 to-rose-500',
     shadow: 'shadow-amber-500/10',
+    badge: 'Dual INR / USD',
+  },
+  {
+    title: 'Enterprise RBAC Roles',
+    icon: Users,
+    description: 'Dedicated workflows for Finance Executives (upload, edit, staging) and Managers (split-screen review, approve/reject).',
+    gradient: 'from-cyan-500 via-blue-500 to-indigo-600',
+    shadow: 'shadow-cyan-500/10',
+    badge: 'Role Isolation',
+  },
+  {
+    title: 'Duplicate & Fraud Risk',
+    icon: ShieldCheck,
+    description: 'Cross-checks vendor GSTIN, invoice numbers, and amount patterns to flag potential duplicates before signoff.',
+    gradient: 'from-emerald-400 via-teal-500 to-cyan-600',
+    shadow: 'shadow-emerald-500/10',
     badge: 'Risk Prevention',
   },
   {
-    title: 'Role-Based Workflow',
-    icon: Users,
-    description: 'Separate experiences for Finance and Managers with secure role-based access and data isolation.',
-    gradient: 'from-cyan-500 via-blue-500 to-indigo-600',
-    shadow: 'shadow-cyan-500/10',
-    badge: 'Enterprise RBAC',
-  },
-  {
-    title: 'Fast Approval Workflow',
-    icon: Zap,
-    description: 'Managers approve or reject invoices with custom comments in just a few clicks with instant state persistence.',
-    gradient: 'from-emerald-400 via-teal-500 to-cyan-600',
-    shadow: 'shadow-emerald-500/10',
-    badge: '1-Click Review',
-  },
-  {
-    title: 'Real-time Dashboard',
+    title: 'Shadcn Vector Analytics',
     icon: LineChart,
-    description: 'Track uploaded, pending, approved and rejected invoices with dynamic financial metrics and charts.',
+    description: 'Recharts spline trends, monthly approved vs pending bar charts, and category spend breakdown with currency toggles.',
     gradient: 'from-purple-500 via-pink-500 to-rose-500',
     shadow: 'shadow-purple-500/10',
-    badge: 'Live Analytics',
+    badge: 'Shadcn UI Charts',
   },
   {
-    title: 'Audit Trail',
+    title: 'Audit Trail & Transparency',
     icon: History,
-    description: 'Maintain complete history of every invoice action with detailed event logs, timestamps, and user tracking.',
+    description: 'Mandatory recorded rejection reasons, timestamped manager signoffs, and complete MongoDB event history.',
     gradient: 'from-sky-400 via-blue-500 to-indigo-600',
     shadow: 'shadow-sky-500/10',
-    badge: 'Compliance Ready',
+    badge: 'Audit Ready',
   },
 ]
 
@@ -70,13 +70,13 @@ export function FeatureGrid() {
       {/* Section Header */}
       <div className="text-center space-y-4 max-w-3xl mx-auto mb-16 sm:mb-20">
         <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1.5 text-xs font-extrabold uppercase tracking-widest text-indigo-300 backdrop-blur-md">
-          <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Enterprise Capabilities
+          <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> Enterprise Features
         </div>
         <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
           Built for <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-sky-400 bg-clip-text text-transparent">Modern Finance Teams</span>
         </h2>
         <p className="text-base text-slate-300 leading-relaxed sm:text-lg">
-          Designed with the precision, security, and performance required by Fortune 500 accounts payable operations.
+          Automate accounts payable with high precision AI extraction, multi-currency ledger tracking, and role-based approval queues.
         </p>
       </div>
 

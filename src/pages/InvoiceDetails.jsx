@@ -26,8 +26,8 @@ import { formatCurrency } from '../utils/formatCurrency'
 export function InvoiceDetails() {
   const { user } = useAuth()
   const userRole = (user?.role || 'finance').toLowerCase()
-  const isManager = userRole === 'manager'
-  const isFinance = userRole === 'finance'
+  const isManager = userRole.includes('manager')
+  const isFinance = userRole.includes('finance') || !isManager
 
   const { invoiceId } = useParams()
   const navigate = useNavigate()
@@ -76,7 +76,7 @@ export function InvoiceDetails() {
           invoiceNumber: resData.invoiceNumber || 'INV-001',
           vendor: resData.vendorName || 'Unknown Vendor',
           vendorName: resData.vendorName || 'Unknown Vendor',
-          vendorGstin: resData.vendorGstin || '22-AAAAA0000A-1-Z-5',
+          vendorGstin: resData.vendorGstin || '',
           category: resData.category || 'General Expense',
           invoiceDate: resData.invoiceDate ? new Date(resData.invoiceDate).toLocaleDateString() : '-',
           dueDate: resData.dueDate ? new Date(resData.dueDate).toLocaleDateString() : '-',
@@ -423,6 +423,31 @@ export function InvoiceDetails() {
         </div>
       </div>
 
+      {/* PROMINENT REJECTION BANNER FOR FINANCE & MANAGER */}
+      {invoice.status === 'Rejected' && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-5 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-rose-700 font-extrabold text-sm">
+              <XCircle className="h-5 w-5 shrink-0 text-rose-600" />
+              <span>Invoice Rejected by Manager</span>
+            </div>
+            {invoice.approvedBy?.name && (
+              <span className="text-xs font-semibold text-rose-600 bg-rose-100/70 border border-rose-200 px-3 py-1 rounded-full">
+                Rejected by: <strong>{invoice.approvedBy.name}</strong>
+              </span>
+            )}
+          </div>
+          <div className="rounded-xl border border-rose-200/80 bg-white p-3.5 text-xs text-slate-800 space-y-1">
+            <p className="font-extrabold text-rose-800 uppercase tracking-wider text-[10px]">
+              Rejection Reason:
+            </p>
+            <p className="font-semibold text-slate-900 leading-relaxed italic">
+              "{invoice.rejectionReason || (invoice.comments && invoice.comments[0]) || 'No specific reason provided.'}"
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Split Grid */}
       <div className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">
         {/* Left Column: Line Items Table & Original Document Preview */}
@@ -493,6 +518,7 @@ export function InvoiceDetails() {
 
         {/* Right Column: AI Insights, Manager Comments, Audit Trail */}
         <div className="space-y-6">
+
           {/* AI Insights Card */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
@@ -508,7 +534,7 @@ export function InvoiceDetails() {
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1.5 border-b border-slate-100">
                 <span className="text-slate-400">Vendor GSTIN</span>
-                <span className="font-mono font-bold text-slate-800">{invoice.vendorGstin}</span>
+                <span className="font-mono font-bold text-slate-800">{invoice.vendorGstin || 'N/A'}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-100">
                 <span className="text-slate-400">Invoice Date</span>

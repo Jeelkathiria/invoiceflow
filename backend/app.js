@@ -34,7 +34,17 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'))
 }
 
-// Health check endpoint
+// Root & Health check endpoints
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'InvoiceFlow Enterprise Backend API Server Operational',
+    health: '/health',
+    version: '1.0.0',
+    timestamp: new Date(),
+  })
+})
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'InvoiceFlow Backend', timestamp: new Date() })
 })

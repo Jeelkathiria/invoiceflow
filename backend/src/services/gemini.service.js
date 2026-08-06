@@ -61,23 +61,33 @@ Do not invent or hardcode data; read directly from the image.
 Output ONLY a raw, valid JSON object matching this schema:
 
 {
-  "vendorName": "string (e.g. Bright Traders, VK Control System, AWS, etc.)",
+  "vendorName": "string or null",
   "vendorGstin": "string or null",
-  "invoiceNumber": "string",
-  "invoiceDate": "YYYY-MM-DD",
-  "dueDate": "YYYY-MM-DD (or null if not mentioned in the bill)",
-  "currency": "USD or INR (detect directly from bill document: '$' or 'USD' -> 'USD', '₹' or 'Rs' or 'INR' -> 'INR')",
+  "buyerName": "string or null",
+  "buyerGstin": "string or null",
+  "invoiceNumber": "string or null",
+  "invoiceDate": "YYYY-MM-DD or string",
+  "dueDate": "YYYY-MM-DD or null",
+  "poNumber": "string or null",
+  "currency": "USD or INR or EUR or GBP",
+  "paymentTerms": "string or null",
   "subtotal": number,
   "gst": number,
+  "cgst": number,
+  "sgst": number,
+  "igst": number,
+  "shippingCharges": number,
+  "otherCharges": number,
   "discount": number,
   "totalAmount": number,
-  "paymentTerms": "string or null",
+  "notes": "string or null",
   "lineItems": [
     {
       "description": "string",
       "quantity": number,
       "unitPrice": number,
-      "tax": number,
+      "taxRate": number,
+      "taxAmount": number,
       "amount": number
     }
   ],
@@ -108,8 +118,9 @@ Return ONLY valid JSON without markdown formatting, quotes wrapping or backticks
   }
 }
 
-function sanitizeExtractedJSON(data, fileName = '') {
-  const overallConfidenceScore = Number(data.overallConfidenceScore) || 98.5
+function sanitizeExtractedJSON(data = {}, fileName = '') {
+  const safeData = data || {}
+  const overallConfidenceScore = Number(safeData.overallConfidenceScore) || 98.5
 
   let confidenceStatus = 'High Confidence'
   if (overallConfidenceScore >= 90) {
@@ -122,10 +133,13 @@ function sanitizeExtractedJSON(data, fileName = '') {
 
   const fallback = getFallbackInvoiceData(fileName)
 
-  // Use live extracted data from Gemini AI as priority
+  // Live extracted data from Gemini AI
   const vendorName = data.vendorName || fallback.vendorName
   const invoiceNumber = data.invoiceNumber || fallback.invoiceNumber
-  const vendorGstin = data.vendorGstin || fallback.vendorGstin
+  const vendorGstin = data.vendorGstin || ''
+  const buyerName = data.buyerName || ''
+  const buyerGstin = data.buyerGstin || ''
+  const poNumber = data.poNumber || ''
   const invoiceDate = data.invoiceDate || fallback.invoiceDate
   const isValidDueDate = data.dueDate && data.dueDate !== 'null' && data.dueDate !== 'N/A' && data.dueDate !== 'undefined'
   const dueDate = isValidDueDate ? data.dueDate : null
@@ -140,25 +154,34 @@ function sanitizeExtractedJSON(data, fileName = '') {
       currency = 'GBP'
     }
   }
-  const subtotal = Number(data.subtotal) || fallback.subtotal
-  const gst = Number(data.gst) || fallback.gst
-  const discount = Number(data.discount) || fallback.discount
+  const subtotal = Number(data.subtotal) || 0
+  const gst = Number(data.gst) || 0
+  const cgst = Number(data.cgst) || 0
+  const sgst = Number(data.sgst) || 0
+  const igst = Number(data.igst) || 0
+  const shippingCharges = Number(data.shippingCharges) || 0
+  const otherCharges = Number(data.otherCharges) || 0
+  const discount = Number(data.discount) || 0
   const totalAmount = Number(data.totalAmount || data.amount) || fallback.totalAmount
+  const notes = data.notes || ''
 
   const rawLineItems = Array.isArray(data.lineItems) && data.lineItems.length > 0
     ? data.lineItems
-    : fallback.lineItems
+    : []
 
   const lineItems = rawLineItems.map((item) => {
     const qty = Number(item.quantity) || 1
     const price = Number(item.unitPrice) || 0
-    const tax = Number(item.tax) || 0
+    const taxRate = Number(item.taxRate) || 0
+    const taxAmt = Number(item.taxAmount || item.tax) || 0
     const amt = Number(item.amount || item.total) || (qty * price) || 0
     return {
       description: item.description || 'Line Item',
       quantity: qty,
       unitPrice: price,
-      tax: tax,
+      tax: taxAmt,
+      taxRate: taxRate,
+      taxAmount: taxAmt,
       amount: amt,
     }
   })
@@ -166,16 +189,25 @@ function sanitizeExtractedJSON(data, fileName = '') {
   return {
     vendorName,
     vendorGstin,
+    buyerName,
+    buyerGstin,
+    poNumber,
     invoiceNumber,
     invoiceDate,
     dueDate,
     currency,
     subtotal,
     gst,
+    cgst,
+    sgst,
+    igst,
+    shippingCharges,
+    otherCharges,
     discount,
+    notes,
     totalAmount,
     amount: totalAmount,
-    paymentTerms: data.paymentTerms || fallback.paymentTerms,
+    paymentTerms: data.paymentTerms || '',
     lineItems,
     overallConfidenceScore,
     fieldConfidenceScores: data.fieldConfidenceScores || {
@@ -191,20 +223,27 @@ function sanitizeExtractedJSON(data, fileName = '') {
 function getFallbackInvoiceData(fileName = '') {
   return {
     vendorName: 'Extracted Vendor',
-    vendorGstin: '22-AAAAA0000A-1-Z-5',
+    vendorGstin: '',
+    buyerName: '',
+    buyerGstin: '',
+    poNumber: '',
     invoiceNumber: 'INV-001',
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: null,
     currency: 'INR',
     subtotal: 0,
     gst: 0,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    shippingCharges: 0,
+    otherCharges: 0,
     discount: 0,
+    notes: '',
     totalAmount: 0,
     amount: 0,
     paymentTerms: 'Due on Receipt',
-    lineItems: [
-      { description: 'Extracted Line Item', quantity: 1, unitPrice: 0, tax: 0, amount: 0 },
-    ],
+    lineItems: [],
     overallConfidenceScore: 90.0,
     confidenceStatus: 'High Confidence',
   }

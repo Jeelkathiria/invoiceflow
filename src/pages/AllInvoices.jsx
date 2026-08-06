@@ -22,7 +22,7 @@ import {
 
 const ITEMS_PER_PAGE = 12
 
-import { formatCurrency } from '../utils/formatCurrency'
+import { formatCurrency, calculateMultiCurrencyTotals } from '../utils/formatCurrency'
 
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === 'null' || dateStr === 'undefined' || dateStr === '-' || dateStr === 'Invalid Date') return '-'
@@ -64,9 +64,10 @@ export function AllInvoices() {
           category: inv.category || 'General Invoices',
           confidenceScore: inv.confidenceScore || 95.0,
           duplicate: Boolean(inv.duplicate),
-          vendorGstin: inv.vendorGstin || '22-AAAAA0000A-1-Z-5',
+          vendorGstin: inv.vendorGstin || '',
           invoiceUrl: inv.invoiceUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
           lineItems: inv.lineItems || [],
+          rejectionReason: inv.rejectionReason || (inv.comments && inv.comments[0]) || '',
         }))
 
         setInvoices(mongoInvoices)
@@ -122,7 +123,10 @@ export function AllInvoices() {
     return filteredInvoices.slice(start, start + ITEMS_PER_PAGE)
   }, [filteredInvoices, currentPage])
 
-  const totalValue = filteredInvoices.reduce((acc, curr) => acc + (curr.amount || 0), 0)
+  // Multi-currency calculation for filtered items
+  const filteredTotals = useMemo(() => {
+    return calculateMultiCurrencyTotals(filteredInvoices)
+  }, [filteredInvoices])
 
   // Status Action handlers
   const handleUpdateStatus = async (item, newStatus) => {
@@ -215,7 +219,17 @@ export function AllInvoices() {
         <div className="flex items-center gap-3">
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 shadow-sm text-right">
             <span className="text-[10px] font-bold uppercase text-slate-400">Total Filtered Value</span>
-            <p className="text-sm font-black text-slate-900">₹{totalValue.toLocaleString()}</p>
+            <div className="flex items-center justify-end gap-2">
+              <p className="text-sm font-black text-slate-900">{filteredTotals.formattedInr}</p>
+              <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-extrabold text-blue-700">
+                {filteredTotals.formattedUsd}
+              </span>
+            </div>
+            {filteredTotals.hasMultipleCurrencies && (
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                Breakdown: {filteredTotals.formattedDual}
+              </p>
+            )}
           </div>
 
           <button
@@ -296,7 +310,7 @@ export function AllInvoices() {
                       <span className="inline-flex rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                         {inv.category}
                       </span>
-                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">GSTIN: {inv.vendorGstin}</p>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">GSTIN: {inv.vendorGstin || 'N/A'}</p>
                     </td>
 
                     {/* Date & Due */}
@@ -343,6 +357,11 @@ export function AllInvoices() {
                         )}
                         {inv.status}
                       </span>
+                      {inv.status === 'Rejected' && inv.rejectionReason && (
+                        <p className="text-[10px] text-rose-600 font-semibold mt-1 max-w-[140px] truncate" title={inv.rejectionReason}>
+                          Reason: {inv.rejectionReason}
+                        </p>
+                      )}
                     </td>
 
                     {/* Action Controls */}
@@ -471,9 +490,20 @@ export function AllInvoices() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Vendor GSTIN:</span>
-                    <span className="text-slate-800 font-mono text-[11px]">{selectedInvoice.vendorGstin}</span>
+                    <span className="text-slate-800 font-mono text-[11px]">{selectedInvoice.vendorGstin || 'N/A'}</span>
                   </div>
                 </div>
+
+                {selectedInvoice.status === 'Rejected' && selectedInvoice.rejectionReason && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs space-y-1">
+                    <p className="font-extrabold text-rose-800 uppercase tracking-wider text-[10px] flex items-center gap-1">
+                      <XCircle className="h-3.5 w-3.5 text-rose-600" /> Rejection Reason:
+                    </p>
+                    <p className="font-semibold text-slate-900 leading-snug">
+                      "{selectedInvoice.rejectionReason}"
+                    </p>
+                  </div>
+                )}
 
                 <h4 className="text-xs font-bold uppercase text-slate-400">Extracted Line Items</h4>
                 <div className="overflow-hidden rounded-xl border border-slate-200 text-xs">

@@ -18,14 +18,17 @@ const server = app.listen(PORT, () => {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.log(`
+    console.error(`
     ======================================================
-    ℹ️ Port ${PORT} is already in use by a running backend process.
-    The InvoiceFlow API is ALREADY ACTIVE and listening at:
-    📡 http://localhost:${PORT}
+    ⚠️  PORT CONFLICT DETECTED: Port ${PORT} is already in use.
+    An existing Node process is running in the background.
+
+    To stop the old process and free Port ${PORT}:
+    👉 Run: npx kill-port ${PORT}
+    or: taskkill /F /IM node.exe
     ======================================================
     `)
-    process.exit(0)
+    process.exit(1)
   } else {
     console.error('Server error:', err)
   }

@@ -30,8 +30,8 @@ export function MainLayout() {
   }, [isNotificationsOpen])
 
   const userRole = (user?.role || 'finance').toLowerCase()
-  const isManager = userRole === 'manager'
-  const isFinance = userRole === 'finance'
+  const isManager = userRole.includes('manager')
+  const isFinance = userRole.includes('finance') || !isManager
 
   const handleLogout = () => {
     logout()

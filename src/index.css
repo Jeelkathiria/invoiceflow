@@ -68,8 +68,35 @@
 .table-row-hover {
   transition: background-color 0.15s ease;
 }
-.table-row-hover:hover {
-  background-color: #f1f5f9;
+/* Signature Font Utility for Datathon Style Logo */
+.font-signature {
+  font-family: 'Caveat', cursive, sans-serif;
+}
+
+/* Target Bracket Box Utility for Flowchart Nodes */
+.target-box-corners {
+  position: relative;
+}
+.target-box-corners::before,
+.target-box-corners::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: currentColor;
+  pointer-events: none;
+}
+.target-box-corners::before {
+  top: -1px;
+  left: -1px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.target-box-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
 }
 
 

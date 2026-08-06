@@ -1,5 +1,9 @@
 import { Invoice } from '../models/Invoice.js'
 
+function escapeRegExp(string) {
+  return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
  * Duplicate Detection Engine
  * Searches MongoDB for potential duplicate invoice entries based on:
@@ -9,10 +13,13 @@ export const checkDuplicateInvoice = async (vendorName, invoiceNumber, amount) =
   if (!vendorName || !invoiceNumber) return { isDuplicate: false, matchedInvoice: null }
 
   try {
+    const escapedVendor = escapeRegExp(vendorName.trim())
+    const escapedInvNum = String(invoiceNumber).trim()
+
     // 1. Check exact combination match in MongoDB
     let duplicateMatch = await Invoice.findOne({
-      vendorName: new RegExp(`^${vendorName.trim()}$`, 'i'),
-      invoiceNumber: invoiceNumber.trim(),
+      vendorName: new RegExp(`^${escapedVendor}$`, 'i'),
+      invoiceNumber: escapedInvNum,
       amount: Number(amount),
     })
       .populate('uploadedBy', 'name email role')
@@ -37,8 +44,8 @@ export const checkDuplicateInvoice = async (vendorName, invoiceNumber, amount) =
 
     // 2. Fallback check for exact invoice number match from same vendor
     duplicateMatch = await Invoice.findOne({
-      vendorName: new RegExp(`^${vendorName.trim()}$`, 'i'),
-      invoiceNumber: invoiceNumber.trim(),
+      vendorName: new RegExp(`^${escapedVendor}$`, 'i'),
+      invoiceNumber: escapedInvNum,
     })
       .populate('uploadedBy', 'name email role')
       .populate('approvedBy', 'name email role')
