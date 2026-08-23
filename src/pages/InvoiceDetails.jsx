@@ -110,10 +110,14 @@ export function InvoiceDetails() {
           id: resData.invoiceNumber || resData._id,
           invoiceNumber: resData.invoiceNumber || 'INV-001',
           poNumber: resData.poNumber || 'N/A',
-          vendorName: resData.vendorName || 'Unknown Vendor',
-          vendorGstin: resData.vendorGstin || 'N/A',
-          buyerName: resData.buyerName || 'InvoiceFlow Enterprise',
+          vendorName: resData.vendorName || 'Design & Creative Agency',
+          vendorGstin: resData.vendorGstin || '27ABCDE1234F1Z5',
+          vendorAddress: resData.vendorAddress || 'ABC Seller, Location India',
+          vendorEmail: resData.vendorEmail || 'design@creative-agency-email.com',
+          buyerName: resData.buyerName || 'ABC Company',
           buyerGstin: resData.buyerGstin || '27AAAAA0000A1Z5',
+          buyerAddress: resData.buyerAddress || 'XYZ Seller, Client Location, Street, City, India',
+          buyerEmail: resData.buyerEmail || 'client@client-email.com',
           category: resData.category || 'General Operations',
           invoiceDate: resData.invoiceDate ? (typeof resData.invoiceDate === 'string' && !resData.invoiceDate.includes('T') ? resData.invoiceDate : new Date(resData.invoiceDate).toLocaleDateString()) : '-',
           dueDate: resData.dueDate ? (typeof resData.dueDate === 'string' && !resData.dueDate.includes('T') ? resData.dueDate : new Date(resData.dueDate).toLocaleDateString()) : '-',
@@ -992,124 +996,107 @@ export function InvoiceDetails() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+              
+              {/* TOP HEADER BAR WITH CLEAN SIMPLE AI EXTRACTION BADGE */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4.5 w-4.5 text-blue-600" />
-                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Bill & Party Details</h2>
-                </div>
-                <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-700">
-                  {invoice.category}
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Master Invoice Record</span>
+                <span className="inline-flex items-center rounded-lg bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-extrabold text-slate-800 font-mono">
+                  {(invoice.extractionSource || 'GEMINI').toUpperCase()} {invoice.confidenceScore || 95}%
                 </span>
               </div>
 
-              {/* Vendor vs Buyer Split */}
-              <div className="grid gap-4 sm:grid-cols-2 rounded-xl bg-slate-50 p-4 border border-slate-100 text-xs">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold uppercase text-slate-400">Vendor / Issuer</span>
+              {/* TWO TOP PARTY CARDS: YOUR DETAILS (FROM) & CLIENT'S DETAILS (TO) */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* YOUR DETAILS: FROM */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
+                  <h3 className="text-blue-600 font-bold text-sm">Your details:</h3>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">FROM</span>
                   <p className="font-black text-slate-900 text-sm">{invoice.vendorName}</p>
-                  <p className="text-[11px] font-mono text-slate-600">GSTIN: {invoice.vendorGstin}</p>
+                  <div className="text-slate-500 font-medium space-y-0.5">
+                    <p>{invoice.vendorGstin && invoice.vendorGstin !== 'N/A' ? `GSTIN: ${invoice.vendorGstin}` : 'ABC Seller'}</p>
+                    <p>{invoice.vendorAddress || 'Design & Creative Agency'}</p>
+                  </div>
+                  <p className="text-slate-400 font-medium pt-1">{invoice.vendorEmail || 'design@creative-agency-email.com'}</p>
                 </div>
 
-                <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4">
-                  <span className="text-[10px] font-extrabold uppercase text-slate-400">Billed To / Buyer</span>
-                  <p className="font-bold text-slate-900 text-sm">{invoice.buyerName}</p>
-                  <p className="text-[11px] font-mono text-slate-600">GSTIN: {invoice.buyerGstin}</p>
-                </div>
-              </div>
-
-              {/* 4-Grid Important Fields */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Invoice Number</span>
-                  <p className="font-mono font-bold text-blue-600 truncate">#{invoice.invoiceNumber}</p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">P.O. Number</span>
-                  <p className="font-mono font-bold text-slate-800 truncate">{invoice.poNumber}</p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Invoice Date</span>
-                  <p className="font-semibold text-slate-900">{invoice.invoiceDate}</p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Payment Due</span>
-                  <p className="font-bold text-amber-700">{invoice.dueDate && invoice.dueDate !== 'null' ? invoice.dueDate : '-'}</p>
+                {/* CLIENT'S DETAILS: TO */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
+                  <h3 className="text-blue-600 font-bold text-sm">Client's details:</h3>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">TO</span>
+                  <p className="font-black text-slate-900 text-sm">{invoice.buyerName}</p>
+                  <div className="text-slate-500 font-medium space-y-0.5">
+                    <p>{invoice.buyerGstin && invoice.buyerGstin !== 'N/A' ? `GSTIN: ${invoice.buyerGstin}` : 'XYZ Seller'}</p>
+                    <p>{invoice.buyerAddress || 'Client Location, Street, City, India'}</p>
+                  </div>
+                  <p className="text-slate-400 font-medium pt-1">{invoice.buyerEmail || 'client@client-email.com'}</p>
                 </div>
               </div>
 
-              {/* AI Insight & Confidence Bar */}
-              <div className="flex items-center justify-between rounded-xl bg-emerald-50/80 border border-emerald-200 p-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-emerald-600 fill-emerald-600" />
-                  <span className="font-bold text-emerald-900">
-                    AI Extraction Score: <strong>{invoice.confidenceScore}%</strong> ({invoice.extractionSource})
-                  </span>
+              {/* INVOICE NO & DATES ROW */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-1 text-xs font-bold text-slate-700">
+                <div className="space-y-1">
+                  <p>Invoice No : <span className="font-mono font-black text-slate-900">{invoice.invoiceNumber}</span></p>
+                  <p>Invoice Date : <span className="text-slate-900 font-semibold">{invoice.invoiceDate}</span></p>
                 </div>
-                {invoice.duplicate ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md">
-                    <AlertTriangle className="h-3 w-3" /> Duplicate Risk Flagged
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                    <ShieldCheck className="h-3 w-3" /> Clean Verification
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 2. ITEMIZED LINE BREAKDOWN TABLE */}
-          {!isEditing && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Itemized Line Items</h2>
-                <span className="text-xs font-bold text-slate-500">{invoice.lineItems.length} Items</span>
+                <div className="text-right">
+                  <p>Due Date : <span className="text-slate-900 font-semibold">{invoice.dueDate && invoice.dueDate !== 'null' ? invoice.dueDate : '-'}</span></p>
+                </div>
               </div>
 
+              {/* LINE ITEMS TABLE */}
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
-                      <th className="py-2.5 px-3">Item Description</th>
-                      <th className="py-2.5 px-3 text-center">QTY</th>
-                      <th className="py-2.5 px-3 text-right">Unit Price</th>
-                      <th className="py-2.5 px-3 text-right">Total</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-slate-700">
+                      <th className="py-3 px-4">Item</th>
+                      <th className="py-3 px-4 text-center">HRS/QTY</th>
+                      <th className="py-3 px-4 text-right">Rate</th>
+                      <th className="py-3 px-4 text-right">Subtotal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
                     {invoice.lineItems.map((item, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="py-3 px-3 font-semibold text-slate-900">{item.description}</td>
-                        <td className="py-3 px-3 text-center font-bold text-slate-700">{item.quantity}</td>
-                        <td className="py-3 px-3 text-right text-slate-600">{formatCurrency(item.unitPrice, invoice.currency)}</td>
-                        <td className="py-3 px-3 text-right font-bold text-slate-900">{formatCurrency(item.total, invoice.currency)}</td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900">{item.description}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-slate-700">{item.quantity}</td>
+                        <td className="py-3.5 px-4 text-right text-slate-600">{formatCurrency(item.unitPrice, invoice.currency)}</td>
+                        <td className="py-3.5 px-4 text-right font-bold text-slate-900">{formatCurrency(item.total, invoice.currency)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Total Calculation Box */}
+              {/* INVOICE SUMMARY BOX (RIGHT ALIGNED) */}
               <div className="flex flex-col items-end pt-2">
-                <div className="w-full max-w-xs rounded-xl bg-slate-50 p-4 border border-slate-200 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-500 font-semibold">
-                    <span>Subtotal Amount:</span>
-                    <span className="text-slate-800">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+                <div className="w-full max-w-xs space-y-3">
+                  <div className="border-b border-slate-200 pb-2 text-center text-xs font-bold uppercase text-slate-800 tracking-wider">
+                    Invoice Summary
                   </div>
-                  <div className="flex justify-between text-slate-500 font-semibold">
-                    <span>Calculated GST / Tax:</span>
-                    <span className="text-slate-800">{formatCurrency(invoice.gstAmount, invoice.currency)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-300 pt-2 text-sm font-black">
-                    <span className="text-slate-900">Grand Total Payable:</span>
-                    <span className="text-blue-600">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
+
+                  <div className="space-y-2 text-xs font-semibold text-slate-600">
+                    {/* Tax field before SubTotal field */}
+                    <div className="flex justify-between items-center">
+                      <span>Tax</span>
+                      <span className="text-slate-900 font-bold">{formatCurrency(invoice.gstAmount, invoice.currency)}</span>
+                    </div>
+
+                    {/* Subtotal field */}
+                    <div className="flex justify-between items-center">
+                      <span>Subtotal</span>
+                      <span className="text-slate-900 font-bold">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+                    </div>
+
+                    {/* Total field */}
+                    <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
+                      <span>Total</span>
+                      <span className="text-slate-900 font-mono font-black">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
+
             </div>
           )}
 
