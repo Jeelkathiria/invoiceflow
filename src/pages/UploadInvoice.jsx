@@ -22,6 +22,7 @@ import {
   Calendar,
   Cpu,
   Zap,
+  Edit3,
 } from 'lucide-react'
 
 import { useAuth } from '../context/AuthContext'
@@ -227,6 +228,48 @@ export function UploadInvoice() {
   const [selectedInvoice, setSelectedInvoice] = useState(null) // Modal details view
   const [overrideModalInvoice, setOverrideModalInvoice] = useState(null) // Duplication override modal
   const [confirmApprovalInvoice, setConfirmApprovalInvoice] = useState(null) // Confirmation modal before approval
+
+  // Finance Team Manual Editing inside Extraction Modal
+  const [isEditingModal, setIsEditingModal] = useState(false)
+  const [editModalData, setEditModalData] = useState(null)
+
+  const startEditingModal = (inv) => {
+    const target = inv || selectedInvoice
+    if (!target) return
+    setEditModalData({
+      vendorName: target.vendorName || '',
+      invoiceNumber: target.invoiceNumber || '',
+      invoiceDate: target.invoiceDate && target.invoiceDate !== '-' ? target.invoiceDate : '',
+      dueDate: target.dueDate && target.dueDate !== '-' && target.dueDate !== 'null' ? target.dueDate : '',
+      vendorGstin: target.vendorGstin && target.vendorGstin !== '-' && target.vendorGstin !== 'N/A' ? target.vendorGstin : '',
+      poNumber: target.poNumber && target.poNumber !== '-' && target.poNumber !== 'N/A' ? target.poNumber : '',
+      subtotal: target.subtotal || 0,
+      gst: target.gst || target.gstAmount || 0,
+      totalAmount: target.totalAmount || target.amount || 0,
+    })
+    setIsEditingModal(true)
+  }
+
+  const saveEditedModalData = () => {
+    if (!selectedInvoice || !editModalData) return
+    const updated = {
+      ...selectedInvoice,
+      vendorName: editModalData.vendorName || selectedInvoice.vendorName,
+      invoiceNumber: editModalData.invoiceNumber || selectedInvoice.invoiceNumber,
+      invoiceDate: editModalData.invoiceDate || selectedInvoice.invoiceDate,
+      dueDate: editModalData.dueDate || selectedInvoice.dueDate,
+      vendorGstin: editModalData.vendorGstin || selectedInvoice.vendorGstin,
+      poNumber: editModalData.poNumber || selectedInvoice.poNumber,
+      subtotal: Number(editModalData.subtotal) || selectedInvoice.subtotal,
+      gst: Number(editModalData.gst) || selectedInvoice.gst,
+      totalAmount: Number(editModalData.totalAmount) || selectedInvoice.totalAmount,
+      amount: Number(editModalData.totalAmount) || selectedInvoice.amount,
+    }
+    setSelectedInvoice(updated)
+    setExtractedInvoices(prev => prev.map(item => item.id === updated.id ? updated : item))
+    setIsEditingModal(false)
+    showToast('Extracted invoice fields updated successfully!', 'success')
+  }
 
   const isLoadedRef = useRef(false)
 
@@ -991,131 +1034,325 @@ export function UploadInvoice() {
               </button>
             </div>
 
+            {/* MISSING / UNEXTRACTED FIELDS CHECKLIST BANNER */}
+            {(() => {
+              const missingMandatory = []
+              const missingOptional = []
+              const inv = selectedInvoice
+
+              if (!inv.vendorName || inv.vendorName === 'Unknown Vendor' || inv.vendorName === 'Extracted Vendor' || inv.vendorName === '-') {
+                missingMandatory.push('Vendor Name')
+              }
+              if (!inv.invoiceNumber || inv.invoiceNumber === 'INV-001' || inv.invoiceNumber === 'N/A' || inv.invoiceNumber === '-') {
+                missingMandatory.push('Invoice Number')
+              }
+              if (!inv.invoiceDate || inv.invoiceDate === '-') {
+                missingMandatory.push('Invoice Date')
+              }
+              if (!Number(inv.totalAmount || inv.amount)) {
+                missingMandatory.push('Total Amount')
+              }
+
+              if (!inv.vendorGstin || inv.vendorGstin === 'N/A' || inv.vendorGstin === '-') {
+                missingOptional.push('Vendor GSTIN')
+              }
+              if (!inv.buyerName || inv.buyerName === 'Unknown Buyer' || inv.buyerName === '-') {
+                missingOptional.push('Buyer Name')
+              }
+              if (!inv.buyerGstin || inv.buyerGstin === 'N/A' || inv.buyerGstin === '-') {
+                missingOptional.push('Buyer GSTIN')
+              }
+              if (!inv.dueDate || inv.dueDate === 'null' || inv.dueDate === '-') {
+                missingOptional.push('Due Date')
+              }
+              if (!inv.poNumber || inv.poNumber === 'N/A' || inv.poNumber === '-') {
+                missingOptional.push('P.O. Number')
+              }
+              if (!Number(inv.subtotal)) {
+                missingOptional.push('Subtotal')
+              }
+              if (!Number(inv.gst || inv.gstAmount)) {
+                missingOptional.push('Tax / GST')
+              }
+
+              const hasMissing = missingMandatory.length > 0 || missingOptional.length > 0
+              if (!hasMissing) return null
+
+              return (
+                <div className="rounded-2xl bg-amber-50/90 border border-amber-200 p-3.5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-amber-900">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>Unextracted / Missing Fields Warning ({missingMandatory.length + missingOptional.length})</span>
+                    </div>
+                    {!isEditingModal && (
+                      <button
+                        onClick={() => startEditingModal(inv)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-2xs hover:bg-amber-700 transition"
+                      >
+                        <Edit3 className="h-3 w-3" /> Fill / Edit Missing Fields
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {missingMandatory.map((f, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 rounded-md bg-rose-100 border border-rose-300 px-2 py-0.5 text-[10px] font-bold text-rose-800">
+                        ⚠️ {f} (Required)
+                      </span>
+                    ))}
+                    {missingOptional.map((f, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                        • {f} (Optional)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Split Content: Bill Left (7 cols), Document & Actions Right (5 cols) */}
             <div className="grid gap-6 md:grid-cols-12">
-              {/* LEFT SIDE: Clean Bill Card */}
+              {/* LEFT SIDE: Clean Bill Card OR Inline Edit Form */}
               <div className="md:col-span-7 flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-5 space-y-4 shadow-2xs">
-                {/* Bill Header Info */}
-                <div>
-                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Vendor / Issuer</span>
-                      <h3 className="text-base font-black text-slate-900 mt-0.5">{selectedInvoice.vendorName}</h3>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                        Date: <strong className="text-slate-800">{selectedInvoice.invoiceDate || '-'}</strong>
-                        {selectedInvoice.dueDate && selectedInvoice.dueDate !== 'null' && selectedInvoice.dueDate !== '-' && (
-                          <span className="ml-2 text-amber-700 font-bold">Due: {selectedInvoice.dueDate}</span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Extraction Source & Confidence Badge */}
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${selectedInvoice.extractionSource === 'OCR'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
-                          }`}
+                {isEditingModal && editModalData ? (
+                  /* FINANCE TEAM EDIT FORM */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <h3 className="text-xs font-extrabold uppercase text-blue-700 tracking-wider">
+                        Edit Extracted Details (Finance Team)
+                      </h3>
+                      <button
+                        onClick={() => setIsEditingModal(false)}
+                        className="text-[11px] font-bold text-slate-400 hover:text-slate-600"
                       >
-                        {selectedInvoice.extractionSource === 'OCR' ? (
-                          <>
-                            <Zap className="h-3 w-3 text-emerald-600 fill-emerald-600" />
-                            Extracted by: OCR
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-3 w-3 text-indigo-600 fill-indigo-600" />
-                            Extracted by: Gemini AI
-                          </>
-                        )}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                        Confidence: {selectedInvoice.ocrConfidence || selectedInvoice.overallConfidenceScore}%
-                      </span>
+                        Cancel
+                      </button>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Vendor Name</label>
+                        <input
+                          type="text"
+                          value={editModalData.vendorName}
+                          onChange={(e) => setEditModalData({ ...editModalData, vendorName: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Invoice Number</label>
+                        <input
+                          type="text"
+                          value={editModalData.invoiceNumber}
+                          onChange={(e) => setEditModalData({ ...editModalData, invoiceNumber: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Invoice Date</label>
+                        <input
+                          type="date"
+                          value={editModalData.invoiceDate}
+                          onChange={(e) => setEditModalData({ ...editModalData, invoiceDate: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Due Date</label>
+                        <input
+                          type="date"
+                          value={editModalData.dueDate}
+                          onChange={(e) => setEditModalData({ ...editModalData, dueDate: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Vendor GSTIN</label>
+                        <input
+                          type="text"
+                          value={editModalData.vendorGstin}
+                          onChange={(e) => setEditModalData({ ...editModalData, vendorGstin: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">P.O. Number</label>
+                        <input
+                          type="text"
+                          value={editModalData.poNumber}
+                          onChange={(e) => setEditModalData({ ...editModalData, poNumber: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Subtotal (₹)</label>
+                        <input
+                          type="number"
+                          value={editModalData.subtotal}
+                          onChange={(e) => setEditModalData({ ...editModalData, subtotal: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Total Tax / GST (₹)</label>
+                        <input
+                          type="number"
+                          value={editModalData.gst}
+                          onChange={(e) => setEditModalData({ ...editModalData, gst: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="font-bold text-slate-700 block mb-1">Total Amount (₹)</label>
+                        <input
+                          type="number"
+                          value={editModalData.totalAmount}
+                          onChange={(e) => setEditModalData({ ...editModalData, totalAmount: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-black text-blue-700 bg-white text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={saveEditedModalData}
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+                    >
+                      <Save className="h-4 w-4" /> Save Updated Details
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  /* STANDARD BILL READ-ONLY VIEW WITH EDIT BUTTON */
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Vendor / Issuer</span>
+                            <button
+                              onClick={() => startEditingModal(selectedInvoice)}
+                              className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 hover:underline"
+                            >
+                              <Edit3 className="h-3 w-3" /> Edit
+                            </button>
+                          </div>
+                          <h3 className="text-base font-black text-slate-900 mt-0.5">{selectedInvoice.vendorName}</h3>
+                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                            Date: <strong className="text-slate-800">{selectedInvoice.invoiceDate || '-'}</strong>
+                            {selectedInvoice.dueDate && selectedInvoice.dueDate !== 'null' && selectedInvoice.dueDate !== '-' && (
+                              <span className="ml-2 text-amber-700 font-bold">Due: {selectedInvoice.dueDate}</span>
+                            )}
+                          </p>
+                        </div>
 
-                {/* Item Table: Product Name, Qty, Price, Tax, Total_Price */}
-                <div className="space-y-2">
-                  <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Item Breakdown</h4>
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-100/70 text-[10px] font-extrabold uppercase text-slate-500">
-                          <th className="py-2.5 px-3">Product Name</th>
-                          <th className="py-2.5 px-3 text-center">Qty</th>
-                          <th className="py-2.5 px-3 text-right">Price</th>
-                          <th className="py-2.5 px-3 text-right">Tax</th>
-                          <th className="py-2.5 px-3 text-right">Total_Price</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {Array.isArray(selectedInvoice.lineItems) && selectedInvoice.lineItems.length > 0 ? (
-                          selectedInvoice.lineItems.map((item, idx) => {
-                            const pName = item.description || item.productName || item.desc || '-'
-                            const qtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : '-'
-                            const priceVal = (item.unitPrice || item.rate) ? formatCurrency(item.unitPrice || item.rate, selectedInvoice.currency) : '-'
-                            const taxVal = (item.tax || item.taxAmount) ? formatCurrency(item.tax || item.taxAmount, selectedInvoice.currency) : (item.taxRate ? `${item.taxRate}%` : '-')
-                            const totalVal = (item.total || item.amount || item.totalPrice) ? formatCurrency(item.total || item.amount || item.totalPrice, selectedInvoice.currency) : '-'
+                        {/* Extraction Source & Confidence Badge */}
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${selectedInvoice.extractionSource === 'OCR'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                              }`}
+                          >
+                            {selectedInvoice.extractionSource === 'OCR' ? (
+                              <>
+                                <Zap className="h-3 w-3 text-emerald-600 fill-emerald-600" />
+                                Extracted by: OCR
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-3 w-3 text-indigo-600 fill-indigo-600" />
+                                Extracted by: Gemini AI
+                              </>
+                            )}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            Confidence: {selectedInvoice.ocrConfidence || selectedInvoice.overallConfidenceScore}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                            return (
-                              <tr key={idx} className="hover:bg-slate-50/50 transition">
-                                <td className="py-2.5 px-3 font-semibold text-slate-900">{pName}</td>
-                                <td className="py-2.5 px-3 text-center font-bold text-slate-700">{qtyVal}</td>
-                                <td className="py-2.5 px-3 text-right text-slate-600">{priceVal}</td>
-                                <td className="py-2.5 px-3 text-right text-slate-600">{taxVal}</td>
-                                <td className="py-2.5 px-3 text-right font-bold text-slate-900">{totalVal}</td>
+                    {/* Item Table: Product Name, Qty, Price, Tax, Total_Price */}
+                    <div className="space-y-2">
+                      <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Item Breakdown</h4>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-slate-100/70 text-[10px] font-extrabold uppercase text-slate-500">
+                              <th className="py-2.5 px-3">Product Name</th>
+                              <th className="py-2.5 px-3 text-center">Qty</th>
+                              <th className="py-2.5 px-3 text-right">Price</th>
+                              <th className="py-2.5 px-3 text-right">Tax</th>
+                              <th className="py-2.5 px-3 text-right">Total_Price</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {Array.isArray(selectedInvoice.lineItems) && selectedInvoice.lineItems.length > 0 ? (
+                              selectedInvoice.lineItems.map((item, idx) => {
+                                const pName = item.description || item.productName || item.desc || '-'
+                                const qtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : '-'
+                                const priceVal = (item.unitPrice || item.rate) ? formatCurrency(item.unitPrice || item.rate, selectedInvoice.currency) : '-'
+                                const taxVal = (item.tax || item.taxAmount) ? formatCurrency(item.tax || item.taxAmount, selectedInvoice.currency) : (item.taxRate ? `${item.taxRate}%` : '-')
+                                const totalVal = (item.total || item.amount || item.totalPrice) ? formatCurrency(item.total || item.amount || item.totalPrice, selectedInvoice.currency) : '-'
+
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/50 transition">
+                                    <td className="py-2.5 px-3 font-semibold text-slate-900">{pName}</td>
+                                    <td className="py-2.5 px-3 text-center font-bold text-slate-700">{qtyVal}</td>
+                                    <td className="py-2.5 px-3 text-right text-slate-600">{priceVal}</td>
+                                    <td className="py-2.5 px-3 text-right text-slate-600">{taxVal}</td>
+                                    <td className="py-2.5 px-3 text-right font-bold text-slate-900">{totalVal}</td>
+                                  </tr>
+                                )
+                              })
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="py-3 px-3 text-center text-slate-400 font-medium">No line items extracted</td>
                               </tr>
-                            )
-                          })
-                        ) : (
-                          <tr>
-                            <td colSpan={5} className="py-3 px-3 text-center text-slate-400 font-medium">No line items extracted</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
 
-                {/* Bottom Summary: SubTotal, Tax (GST / SGST / Tax), TOTAL AMOUNT */}
-                <div className="border-t border-slate-200/80 pt-3 space-y-1.5">
-                  {(() => {
-                    const effectiveSubtotal = Number(selectedInvoice.subtotal) || 0
-                    const effectiveTotal = Number(selectedInvoice.totalAmount) || 0
-                    let effectiveTax = Number(selectedInvoice.gst) || Number(selectedInvoice.cgst || 0) + Number(selectedInvoice.sgst || 0) + Number(selectedInvoice.igst || 0)
+                    {/* Bottom Summary: SubTotal, Tax (GST / SGST / Tax), TOTAL AMOUNT */}
+                    <div className="border-t border-slate-200/80 pt-3 space-y-1.5">
+                      {(() => {
+                        const effectiveSubtotal = Number(selectedInvoice.subtotal) || 0
+                        const effectiveTotal = Number(selectedInvoice.totalAmount) || 0
+                        let effectiveTax = Number(selectedInvoice.gst) || Number(selectedInvoice.cgst || 0) + Number(selectedInvoice.sgst || 0) + Number(selectedInvoice.igst || 0)
 
-                    if (effectiveTotal > effectiveSubtotal && effectiveSubtotal > 0 && effectiveTax === 0) {
-                      effectiveTax = Math.round((effectiveTotal - effectiveSubtotal) * 100) / 100
-                    }
+                        if (effectiveTotal > effectiveSubtotal && effectiveSubtotal > 0 && effectiveTax === 0) {
+                          effectiveTax = Math.round((effectiveTotal - effectiveSubtotal) * 100) / 100
+                        }
 
-                    return (
-                      <>
-                        <div className="flex items-center justify-between text-xs text-slate-600">
-                          <span className="font-bold text-slate-700">SubTotal:</span>
-                          <span className="font-semibold text-slate-900">
-                            {effectiveSubtotal > 0 ? formatCurrency(effectiveSubtotal, selectedInvoice.currency) : '-'}
-                          </span>
-                        </div>
+                        return (
+                          <>
+                            <div className="flex items-center justify-between text-xs text-slate-600">
+                              <span className="font-bold text-slate-700">SubTotal:</span>
+                              <span className="font-semibold text-slate-900">
+                                {effectiveSubtotal > 0 ? formatCurrency(effectiveSubtotal, selectedInvoice.currency) : '-'}
+                              </span>
+                            </div>
 
-                        <div className="flex items-center justify-between text-xs text-slate-600">
-                          <span className="font-bold text-slate-700">Tax (GST / SGST / Tax):</span>
-                          <span className="font-semibold text-slate-900">
-                            {effectiveTax > 0 ? formatCurrency(effectiveTax, selectedInvoice.currency) : '-'}
-                          </span>
-                        </div>
+                            <div className="flex items-center justify-between text-xs text-slate-600">
+                              <span className="font-bold text-slate-700">Tax (GST / SGST / Tax):</span>
+                              <span className="font-semibold text-slate-900">
+                                {effectiveTax > 0 ? formatCurrency(effectiveTax, selectedInvoice.currency) : '-'}
+                              </span>
+                            </div>
 
-                        <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
-                          <span className="font-extrabold uppercase">TOTAL AMOUNT:</span>
-                          <span className="text-base text-blue-700 font-black">
-                            {effectiveTotal > 0 ? formatCurrency(effectiveTotal, selectedInvoice.currency) : '-'}
-                          </span>
-                        </div>
-                      </>
-                    )
-                  })()}
-                </div>
+                            <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
+                              <span className="font-extrabold uppercase">TOTAL AMOUNT:</span>
+                              <span className="text-base text-blue-700 font-black">
+                                {effectiveTotal > 0 ? formatCurrency(effectiveTotal, selectedInvoice.currency) : '-'}
+                              </span>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* RIGHT SIDE: Document Image & Action Buttons */}
