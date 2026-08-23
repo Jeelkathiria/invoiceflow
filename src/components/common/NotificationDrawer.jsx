@@ -147,48 +147,57 @@ export function NotificationDrawer({ isOpen, onClose }) {
                   No active notifications found in MongoDB.
                 </div>
               ) : (
-                notifications.map((item) => (
-                  <div
-                    key={item._id}
-                    onClick={() => handleItemClick(item)}
-                    className={`group relative p-4 rounded-2xl border transition cursor-pointer ${
-                      !item.read
-                        ? 'border-blue-500/40 bg-slate-800/80 shadow-xs'
-                        : 'border-slate-800/80 bg-slate-950/60 hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {item.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />}
-                        {item.type === 'danger' && <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />}
-                        {item.type === 'info' && <Sparkles className="h-4 w-4 shrink-0 text-blue-400" />}
-                        {item.type === 'success' && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />}
-                        <span className={`text-xs font-bold truncate ${!item.read ? 'text-white font-extrabold' : 'text-slate-300'}`}>
-                          {item.title}
-                        </span>
+                notifications.map((item) => {
+                  const titleDisplay = item.title === 'Invoice Approved' ? 'Manager Approved (Payment Pending)' : item.title === 'Payment Confirmed' ? 'Payment Confirmed & Disbursed' : item.title
+                  const messageDisplay = item.message && item.message.includes('has been approved and added to the Payment Queue')
+                    ? item.message.replace('has been approved and added to the Payment Queue', 'was approved by Manager and sent to Payment Queue (Pending Finance Confirmation)')
+                    : item.message && item.message.includes('has been marked as paid')
+                    ? item.message.replace('has been marked as paid', 'was confirmed & paid by Finance Department')
+                    : item.message
+
+                  return (
+                    <div
+                      key={item._id}
+                      onClick={() => handleItemClick(item)}
+                      className={`group relative p-4 rounded-2xl border transition cursor-pointer ${
+                        !item.read
+                          ? 'border-blue-500/40 bg-slate-800/80 shadow-xs'
+                          : 'border-slate-800/80 bg-slate-950/60 hover:bg-slate-800/40'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {item.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />}
+                          {item.type === 'danger' && <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />}
+                          {item.type === 'info' && <Sparkles className="h-4 w-4 shrink-0 text-blue-400" />}
+                          {item.type === 'success' && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />}
+                          <span className={`text-xs font-bold truncate ${!item.read ? 'text-white font-extrabold' : 'text-slate-300'}`}>
+                            {titleDisplay}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            {formatTimeAgo(item.createdAt)}
+                          </span>
+                          <button
+                            onClick={(e) => handleDeleteItem(e, item._id)}
+                            className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition"
+                            title="Delete notification"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] font-semibold text-slate-500">
-                          {formatTimeAgo(item.createdAt)}
-                        </span>
-                        <button
-                          onClick={(e) => handleDeleteItem(e, item._id)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 p-1 transition"
-                          title="Delete notification"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">{messageDisplay}</p>
+
+                      {!item.read && (
+                        <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-blue-500 ring-4 ring-slate-900"></span>
+                      )}
                     </div>
-
-                    <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">{item.message}</p>
-
-                    {!item.read && (
-                      <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-blue-500 ring-4 ring-slate-900"></span>
-                    )}
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

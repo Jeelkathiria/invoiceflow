@@ -26,9 +26,10 @@ const PAYMENT_TERMS_REGEX = /(?:payment\s*terms|terms)[:.\s]*([^\n\r]+)/i
 const NOTES_REGEX = /(?:notes|remarks|terms\s*&\s*conditions)[:.\s]*([^\n\r]+)/i
 
 // Tax Breakdown & Totals Patterns
-const TOTAL_AMOUNT_REGEX = /(?:grand\s*total|total\s*amount|total\s*payable|amount\s*payable|net\s*amount|total)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
-const SUBTOTAL_REGEX = /(?:subtotal|sub-total|taxable\s*value|taxable\s*amount)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
-const GST_AMOUNT_REGEX = /(?:gst\s*amount|total\s*tax|vat\s*amount|tax)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
+const TOTAL_AMOUNT_REGEX = /(?:balance\s*due|grand\s*total|total\s*payable|amount\s*payable|net\s*amount|(?:(?<!sub\s*|sub-)total))[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
+const SUBTOTAL_REGEX = /(?:subtotal|sub-total|sub\s*total|taxable\s*value|taxable\s*amount)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
+const TAX_RATE_REGEX = /(?:tax\s*rate|vat\s*rate|gst\s*rate)[:.\s]*([0-9]+(?:\.[0-9]+)?)\s*%/i
+const GST_AMOUNT_REGEX = /(?:gst\s*amount|total\s*tax|vat\s*amount|tax(?!\s*rate))[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
 const CGST_REGEX = /(?:cgst)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
 const SGST_REGEX = /(?:sgst)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
 const IGST_REGEX = /(?:igst)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i
@@ -52,18 +53,31 @@ export function computeMissingFields(data = {}) {
   const missingMandatoryFields = []
   const missingOptionalFields = []
 
+  const isInvalidDoc = safeData.isValidInvoice === false || safeData.isInvoiceDocument === false
+
+  if (isInvalidDoc) {
+    missingMandatoryFields.push('Document Validation (Uploaded File is NOT a Valid Invoice)')
+  }
+
   // Mandatory checks
-  if (!safeData.vendorName || String(safeData.vendorName).trim() === '' || safeData.vendorName === 'Unknown Vendor' || safeData.vendorName === 'Extracted Vendor') {
+  const vName = String(safeData.vendorName || '').trim()
+  if (!vName || vName === 'Unknown Vendor' || vName === 'Extracted Vendor' || vName.includes('Unrecognized Vendor')) {
     missingMandatoryFields.push('Vendor Name')
   }
-  if (!safeData.invoiceNumber || String(safeData.invoiceNumber).trim() === '' || safeData.invoiceNumber === 'INV-001') {
+  
+  const invNum = String(safeData.invoiceNumber || '').trim()
+  if (!invNum || invNum === 'INV-001' || invNum === 'N/A' || invNum === 'INV-INVALID') {
     missingMandatoryFields.push('Invoice Number')
   }
-  if (!safeData.invoiceDate || String(safeData.invoiceDate).trim() === '' || safeData.invoiceDate === '-') {
+
+  const invDate = String(safeData.invoiceDate || '').trim()
+  if (!invDate || invDate === '-') {
     missingMandatoryFields.push('Invoice Date')
   }
-  if (!safeData.totalAmount || Number(safeData.totalAmount) <= 0) {
-    missingMandatoryFields.push('Grand Total')
+
+  const totAmt = Number(safeData.totalAmount || safeData.amount || 0)
+  if (totAmt <= 0) {
+    missingMandatoryFields.push('Grand Total / Total Payable Amount (₹0)')
   }
 
   // Optional checks
@@ -178,25 +192,54 @@ export function parseHeaderFields(rawText = '', lines = []) {
   const notesMatch = text.match(NOTES_REGEX)
   const notes = notesMatch ? notesMatch[1].trim() : ''
 
-  // Currency
+  // Currency Detection: Default to INR for Indian invoices
   let currency = 'INR'
-  if (text.includes('$') || text.toUpperCase().includes('USD')) {
+  const upperText = text.toUpperCase()
+  if (
+    text.includes('₹') ||
+    upperText.includes('INR') ||
+    upperText.includes('RS.') ||
+    upperText.includes('RS ') ||
+    upperText.includes('RUPEE') ||
+    GSTIN_REGEX.test(text)
+  ) {
+    currency = 'INR'
+  } else if (text.includes('$') || upperText.includes('USD')) {
     currency = 'USD'
-  } else if (text.includes('€') || text.toUpperCase().includes('EUR')) {
+  } else if (text.includes('€') || upperText.includes('EUR')) {
     currency = 'EUR'
-  } else if (text.includes('£') || text.toUpperCase().includes('GBP')) {
+  } else if (text.includes('£') || upperText.includes('GBP')) {
     currency = 'GBP'
   }
 
-  // Totals & Tax Breakdowns
-  const totalMatch = text.match(TOTAL_AMOUNT_REGEX)
-  const totalAmount = totalMatch ? parseNumber(totalMatch[1]) : 0
+  // Balance Due / Grand Total matching
+  let totalAmount = 0
+  const balanceDueMatch = text.match(/(?:balance\s*due|grand\s*total|total\s*payable|amount\s*payable)[:.\s]*[₹$€£\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i)
+  if (balanceDueMatch) {
+    totalAmount = parseNumber(balanceDueMatch[1])
+  } else {
+    const totalMatch = text.match(TOTAL_AMOUNT_REGEX)
+    totalAmount = totalMatch ? parseNumber(totalMatch[1]) : 0
+  }
 
-  const subtotalMatch = text.match(SUBTOTAL_REGEX)
-  const subtotal = subtotalMatch ? parseNumber(subtotalMatch[1]) : 0
+  let subtotalMatch = text.match(SUBTOTAL_REGEX)
+  let subtotal = subtotalMatch ? parseNumber(subtotalMatch[1]) : 0
+
+  const taxRateMatch = text.match(TAX_RATE_REGEX)
+  const taxRate = taxRateMatch ? parseFloat(taxRateMatch[1]) : 0
 
   const gstMatch = text.match(GST_AMOUNT_REGEX)
-  const gst = gstMatch ? parseNumber(gstMatch[1]) : 0
+  let gst = gstMatch ? parseNumber(gstMatch[1]) : 0
+
+  // Precise mathematical tax & subtotal reconciliation
+  if (totalAmount > subtotal && subtotal > 0) {
+    gst = Math.round((totalAmount - subtotal) * 100) / 100
+  } else if (gst === 0 && taxRate > 0 && subtotal > 0) {
+    gst = Math.round((subtotal * (taxRate / 100)) * 100) / 100
+    if (totalAmount === 0) totalAmount = subtotal + gst
+  } else if (subtotal === 0 && totalAmount > 0 && gst > 0) {
+    subtotal = Math.round((totalAmount - gst) * 100) / 100
+  }
 
   const cgstMatch = text.match(CGST_REGEX)
   const cgst = cgstMatch ? parseNumber(cgstMatch[1]) : 0
@@ -223,8 +266,8 @@ export function parseHeaderFields(rawText = '', lines = []) {
     notes,
     currency,
     totalAmount,
-    subtotal: subtotal || (totalAmount > 0 ? Math.round(totalAmount * 0.85) : 0),
-    gst: gst || (totalAmount > 0 ? Math.round(totalAmount * 0.15) : 0),
+    subtotal,
+    gst,
     cgst,
     sgst,
     igst,
@@ -279,41 +322,57 @@ export function parseTableLineItems(lines = []) {
   for (const line of tableLines) {
     const tokens = line.split(/\s+/).filter(Boolean)
     if (tokens.length >= 3) {
-      const numbers = []
-      const textParts = []
-
-      for (const token of tokens) {
-        const num = parseNumber(token)
-        if (num > 0 || token === '0') {
-          numbers.push(num)
-        } else {
-          textParts.push(token)
-        }
+      // Remove leading row index token (e.g., "# 1", "1", "2", "3")
+      let cleanedTokens = [...tokens]
+      if (/^[0-9]+[.]?$/.test(cleanedTokens[0])) {
+        cleanedTokens.shift()
       }
 
-      if (numbers.length >= 2 && textParts.length >= 1) {
-        const description = textParts.join(' ')
-        let quantity = 1
-        let unitPrice = numbers[0]
-        let amount = numbers[numbers.length - 1]
+      if (cleanedTokens.length >= 2) {
+        const numbers = []
+        const textParts = []
 
-        if (numbers.length >= 3) {
-          quantity = numbers[0] < 100 ? numbers[0] : 1
-          unitPrice = numbers[numbers.length >= 4 ? 1 : 0]
-          amount = numbers[numbers.length - 1]
+        for (const token of cleanedTokens) {
+          const num = parseNumber(token)
+          if (num > 0 || token === '0' || token === '0.00' || token === '1.00') {
+            if (/\d/.test(token)) {
+              numbers.push(num)
+            } else {
+              textParts.push(token)
+            }
+          } else {
+            textParts.push(token)
+          }
         }
 
-        if (description.length > 2 && amount > 0) {
-          const taxAmount = Math.round((amount - (quantity * unitPrice)) * 100) / 100 || 0
-          lineItems.push({
-            description,
-            quantity: quantity || 1,
-            unitPrice: unitPrice || amount,
-            tax: taxAmount,
-            taxRate: 0,
-            taxAmount: taxAmount,
-            amount: amount,
-          })
+        if (numbers.length >= 2 && textParts.length >= 1) {
+          const description = textParts.join(' ')
+          let quantity = 1
+          let unitPrice = numbers[0]
+          let amount = numbers[numbers.length - 1]
+
+          if (numbers.length >= 3) {
+            quantity = numbers[0] < 100 ? numbers[0] : 1
+            unitPrice = numbers[1]
+            amount = numbers[numbers.length - 1]
+          }
+
+          if (description.length > 2 && amount > 0) {
+            const calculatedTotal = quantity * unitPrice
+            let taxAmount = 0
+            if (amount > calculatedTotal && calculatedTotal > 0) {
+              taxAmount = Math.round((amount - calculatedTotal) * 100) / 100
+            }
+            lineItems.push({
+              description,
+              quantity: quantity || 1,
+              unitPrice: unitPrice || amount,
+              tax: taxAmount,
+              taxRate: 0,
+              taxAmount: taxAmount,
+              amount: amount,
+            })
+          }
         }
       }
     }
@@ -324,10 +383,12 @@ export function parseTableLineItems(lines = []) {
 
 /**
  * Strict Rule Engine & Routing Evaluator
- * Evaluates whether OCR output meets all mandatory criteria for OCR_ONLY processing:
+ * Evaluates whether OCR output meets strict criteria for OCR_ONLY processing:
  * 1. OCR Confidence >= 90%
- * 2. All 4 mandatory header fields present (vendorName, invoiceNumber, invoiceDate, totalAmount)
- * 3. Zero critical parsing errors
+ * 2. All 4 mandatory header fields present (vendorName, invoiceNumber, invoiceDate, totalAmount > 0)
+ * 3. Zero critical parsing errors (e.g. corrupted line items)
+ *
+ * IF OCR Confidence is below 90% or mandatory fields are missing, it MUST route to GEMINI AI fallback.
  */
 export function evaluateOCRQuality(rawText, ocrConfidence, lines = []) {
   const headerData = parseHeaderFields(rawText, lines)
@@ -339,19 +400,31 @@ export function evaluateOCRQuality(rawText, ocrConfidence, lines = []) {
   })
 
   const validationErrors = []
+  const rawScore = Number(ocrConfidence) || 0
 
-  // Rule 1: OCR Confidence Threshold (>= 90%)
-  if (ocrConfidence < 90) {
-    validationErrors.push(`OCR confidence (${ocrConfidence}%) is below the required 90% threshold.`)
+  // Rule 1: OCR Confidence MUST be >= 90%
+  if (rawScore < 90) {
+    validationErrors.push(`OCR confidence score (${rawScore.toFixed(1)}%) is below the required 90% threshold. Initiating Gemini AI fallback.`)
   }
 
   // Rule 2: Mandatory Header Fields check
   if (missingMandatoryFields.length > 0) {
-    validationErrors.push(`Missing mandatory fields: ${missingMandatoryFields.join(', ')}`)
+    validationErrors.push(`Missing mandatory fields for local OCR: ${missingMandatoryFields.join(', ')}`)
   }
 
-  // High confidence OCR_ONLY requires OCR confidence >= 90% AND all mandatory fields present
-  const isHighConfidence = ocrConfidence >= 90 && missingMandatoryFields.length === 0
+  // Rule 3: Line items sanity check
+  let lineItemsCorrupted = false
+  for (const item of lineItems) {
+    if (item.amount > 50 && (item.unitPrice <= 1 || item.tax > item.amount * 0.5)) {
+      lineItemsCorrupted = true
+      validationErrors.push(`Corrupted line item detected: ${item.description}`)
+      break
+    }
+  }
+
+  // STRICT REQUIREMENT: OCR_ONLY strategy ONLY if confidence >= 90% AND zero missing mandatory fields AND line items uncorrupted
+  const isHighConfidence = rawScore >= 90 && missingMandatoryFields.length === 0 && !lineItemsCorrupted
+
   const strategy = isHighConfidence ? 'OCR_ONLY' : 'OCR_FALLBACK_GEMINI'
   const extractionSource = isHighConfidence ? 'OCR' : 'GEMINI'
 
@@ -362,7 +435,7 @@ export function evaluateOCRQuality(rawText, ocrConfidence, lines = []) {
     validationErrors,
     missingMandatoryFields,
     missingOptionalFields,
-    ocrConfidence,
+    ocrConfidence: rawScore,
     parsedData: {
       ...headerData,
       lineItems,

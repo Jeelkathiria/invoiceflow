@@ -13,13 +13,28 @@ const approvalLogSchema = new mongoose.Schema({
   },
   action: {
     type: String,
-    enum: ['Approved', 'Rejected', 'Flagged'],
+    enum: ['Approved', 'Rejected', 'Flagged', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RESUBMITTED'],
     required: true,
+  },
+  reason: {
+    type: String,
+    default: '',
   },
   comment: {
     type: String,
     default: '',
   },
+  revisionNumber: {
+    type: Number,
+    default: 1,
+  },
+  changes: [
+    {
+      field: String,
+      oldValue: mongoose.Schema.Types.Mixed,
+      newValue: mongoose.Schema.Types.Mixed,
+    },
+  ],
   timestamp: {
     type: Date,
     default: Date.now,

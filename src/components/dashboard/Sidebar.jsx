@@ -10,6 +10,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import Button from '../common/Button.jsx';
+import { Logo } from '../common/Logo.jsx';
 
 const user = {
   name: 'John Morris',
@@ -54,12 +55,10 @@ export default function Sidebar({ collapsed, mobileOpen, onClose, onToggle }) {
             >
               <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-brand-600 text-white shadow-sm">
-                    <span className="text-lg font-semibold">IF</span>
-                  </div>
+                  <Logo className="h-10 w-10" />
                   <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-brand-600">InvoiceFlow</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">Finance Workspace</p>
+                    <p className="text-xs uppercase tracking-[0.35em] text-blue-600 font-extrabold">InvoiceFlow</p>
+                    <p className="mt-0.5 text-base font-bold text-slate-900">Finance Workspace</p>
                   </div>
                 </div>
                 <Button variant="secondary" onClick={onClose} className="px-3 py-2">
@@ -120,13 +119,11 @@ export default function Sidebar({ collapsed, mobileOpen, onClose, onToggle }) {
       >
         <div className="flex h-20 items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-brand-600 text-white shadow-sm">
-              <span className="text-base font-semibold">IF</span>
-            </div>
+            <Logo className="h-10 w-10" />
             {!collapsed ? (
               <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-brand-600">InvoiceFlow</p>
-                <p className="text-lg font-semibold text-slate-900">Finance Workspace</p>
+                <p className="text-xs uppercase tracking-[0.35em] text-blue-600 font-extrabold">InvoiceFlow</p>
+                <p className="text-base font-bold text-slate-900">Finance Workspace</p>
               </div>
             ) : null}
           </div>

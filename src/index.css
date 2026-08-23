@@ -4,18 +4,44 @@
 
 @layer base {
   :root {
-    color-scheme: light;
+    color-scheme: light !important;
     font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, sans-serif;
+  }
+
+  html {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
   }
 
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
     -webkit-font-smoothing: antialiased;
   }
+
+  input, select, textarea {
+    border: none !important;
+    outline: none !important;
+  }
 }
+
+/* Remove black borders/outlines from inputs */
+input:focus, input:active, input:hover {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove webkit autofill border and background box */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
 
 /* Glassmorphism & Enterprise Card Utilities */
 .glass-card {
@@ -98,5 +124,4 @@
   border-bottom-width: 2px;
   border-right-width: 2px;
 }
-
-
+/* Custom CSS rules */

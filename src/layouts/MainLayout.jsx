@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom'
-import { Bell, FileText, Home, ListChecks, LogOut, User, Search, Plus, Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Bell, FileText, Home, ListChecks, LogOut, User, Search, Plus, Menu, X, PanelLeftClose, PanelLeftOpen, CreditCard, History, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { GlobalSearchModal } from '../components/common/GlobalSearchModal'
 import { NotificationDrawer } from '../components/common/NotificationDrawer'
@@ -43,18 +43,22 @@ export function MainLayout() {
     ? [
         { to: '/app', label: 'Dashboard', icon: Home, badge: null },
         { to: '/app/approval-queue', label: 'Approval Queue', icon: ListChecks, badge: null },
+        { to: '/app/payment-queue', label: 'Payment Queue', icon: CreditCard, badge: null },
         { to: '/app/invoices', label: 'All Invoices', icon: FileText, badge: null },
+        { to: '/app/manager/team', label: 'Finance Team', icon: Users, badge: null },
         { to: '/app/profile', label: 'Profile', icon: User, badge: null },
       ]
     : [
         { to: '/app', label: 'Dashboard', icon: Home, badge: null },
         { to: '/app/upload', label: 'Upload Invoice', icon: Plus, badge: null },
+        { to: '/app/payment-queue', label: 'Payment Queue', icon: CreditCard, badge: null },
+        { to: '/app/payment-history', label: 'Payment History', icon: History, badge: null },
         { to: '/app/invoices', label: 'All Invoices', icon: FileText, badge: null },
         { to: '/app/profile', label: 'Profile', icon: User, badge: null },
       ]
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="min-h-screen bg-white text-slate-900 font-sans">
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
 

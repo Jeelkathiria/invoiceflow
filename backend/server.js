@@ -33,3 +33,11 @@ server.on('error', (err) => {
     console.error('Server error:', err)
   }
 })
+
+process.on('uncaughtException', (err) => {
+  console.warn('[Server Process Uncaught Exception Safe Guard]:', err?.message || err)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.warn('[Server Process Unhandled Rejection Safe Guard]:', reason?.message || reason)
+})

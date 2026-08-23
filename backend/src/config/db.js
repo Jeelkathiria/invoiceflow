@@ -3,8 +3,8 @@ import mongoose from 'mongoose'
 export const seedDefaultUsers = async () => {
   try {
     const { User } = await import('../models/User.js')
-    
-    // Seed or ensure single Manager Account: Manager@gmail.com / Manager
+
+    // Seed or ensure Manager Account: Manager@gmail.com / Manager
     const managerEmail = 'manager@gmail.com'
     let manager = await User.findOne({ email: managerEmail })
     if (!manager) {
@@ -16,10 +16,13 @@ export const seedDefaultUsers = async () => {
       })
       console.log('[MongoDB Seed] Created fixed Manager account: Manager@gmail.com')
     } else {
-      manager.password = 'Manager'
-      manager.role = 'manager'
-      await manager.save()
-      console.log('[MongoDB Seed] Ensured Manager account: Manager@gmail.com / Manager')
+      const isPasswordValid = await manager.comparePassword('Manager')
+      if (!isPasswordValid || manager.role !== 'manager') {
+        manager.password = 'Manager'
+        manager.role = 'manager'
+        await manager.save()
+        console.log('[MongoDB Seed] Updated Manager account: Manager@gmail.com')
+      }
     }
   } catch (err) {
     console.warn('[MongoDB Seed Error]:', err.message)

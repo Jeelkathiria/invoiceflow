@@ -135,18 +135,54 @@ const invoiceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Draft', 'Pending', 'Approved', 'Rejected'],
+      enum: [
+        'Draft',
+        'DRAFT',
+        'Pending',
+        'PENDING_APPROVAL',
+        'Approved',
+        'APPROVED',
+        'PAYMENT_QUEUE',
+        'Paid',
+        'PAID',
+        'Rejected',
+        'REJECTED',
+        'NEEDS_CORRECTION',
+        'DUPLICATE_SUBMISSION',
+        'ALREADY_PAID',
+        'RESUBMITTED',
+      ],
       default: 'Pending',
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['UNPAID', 'PENDING', 'PAYMENT_PENDING', 'PAID'],
+      default: 'UNPAID',
+    },
+    paidBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    paidAt: {
+      type: Date,
     },
     duplicate: {
       type: Boolean,
       default: false,
     },
     matchedInvoice: {
+      id: { type: mongoose.Schema.Types.ObjectId },
       invoiceNumber: { type: String, default: '' },
       vendorName: { type: String, default: '' },
       amount: { type: Number, default: 0 },
       status: { type: String, default: '' },
+      rawStatus: { type: String, default: '' },
+      sentBy: { type: String, default: '' },
+      submittedBy: { type: String, default: '' },
+      approvedBy: { type: String, default: '' },
+      paidBy: { type: String, default: '' },
+      paidAt: { type: Date },
+      reason: { type: String, default: '' },
       createdAt: { type: Date },
     },
     uploadedBy: {
@@ -158,10 +194,85 @@ const invoiceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    rejectedAt: {
+      type: Date,
+    },
     rejectionReason: {
       type: String,
       default: '',
     },
+    rejectionComment: {
+      type: String,
+      default: '',
+    },
+    relatedInvoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Invoice',
+      default: null,
+    },
+    revisionNumber: {
+      type: Number,
+      default: 1,
+    },
+    previousRevisionData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    approvalHistory: [
+      {
+        action: {
+          type: String,
+          required: true,
+        },
+        previousStatus: {
+          type: String,
+          default: '',
+        },
+        newStatus: {
+          type: String,
+          default: '',
+        },
+        performedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        performedByName: {
+          type: String,
+          default: '',
+        },
+        performedByRole: {
+          type: String,
+          default: '',
+        },
+        reason: {
+          type: String,
+          default: '',
+        },
+        comment: {
+          type: String,
+          default: '',
+        },
+        revisionNumber: {
+          type: Number,
+          default: 1,
+        },
+        changes: [
+          {
+            field: String,
+            oldValue: mongoose.Schema.Types.Mixed,
+            newValue: mongoose.Schema.Types.Mixed,
+          },
+        ],
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 )

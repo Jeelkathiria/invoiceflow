@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../services/axios'
 import { DocumentViewer } from '../components/DocumentViewer'
@@ -20,6 +21,7 @@ import {
 const ITEMS_PER_PAGE = 12
 
 import { formatCurrency, calculateMultiCurrencyTotals } from '../utils/formatCurrency'
+import { RejectInvoiceModal } from '../components/invoice/RejectInvoiceModal'
 
 export function ApprovalQueue() {
   const { user } = useAuth()
@@ -33,9 +35,8 @@ export function ApprovalQueue() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedModalInvoice, setSelectedModalInvoice] = useState(null)
   const [managerComment, setManagerComment] = useState('')
-  const [rejectingInvoice, setRejectingInvoice] = useState(null)
-  const [rejectionReasonText, setRejectionReasonText] = useState('')
-  const [rejectionError, setRejectionError] = useState('')
+  const [selectedInvoiceToReject, setSelectedInvoiceToReject] = useState(null)
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [toast, setToast] = useState(null)
 
   const showToast = (message, type = 'info') => {
@@ -46,7 +47,7 @@ export function ApprovalQueue() {
   const fetchInvoices = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/invoices')
+      const res = await api.get('/invoices?status=Pending')
       if (res.data && res.data.data && Array.isArray(res.data.data.invoices)) {
         const mongoInvoices = res.data.data.invoices.map((inv) => ({
           _id: inv._id,
@@ -54,7 +55,7 @@ export function ApprovalQueue() {
           invoiceNumber: inv.invoiceNumber || 'INV-001',
           vendorName: inv.vendorName || 'Unknown Vendor',
           category: inv.category || 'General Invoices',
-          submittedBy: inv.uploadedBy?.name || 'Finance Executive',
+          submittedBy: 'Finance Executive',
           invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '-',
           dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-',
           totalAmount: inv.amount || inv.totalAmount || 0,
@@ -65,8 +66,13 @@ export function ApprovalQueue() {
           priority: inv.amount > 50000 ? 'High' : 'Normal',
           confidenceScore: inv.confidenceScore || 95.0,
           duplicate: Boolean(inv.duplicate),
+          matchedInvoice: inv.matchedInvoice || null,
           aiFlag: inv.duplicate ? 'Duplicate Risk' : 'Clean Match',
           status: inv.status || 'Pending',
+          revisionNumber: inv.revisionNumber || 1,
+          rejectionReason: inv.rejectionReason || '',
+          rejectionComment: inv.rejectionComment || '',
+          previousRevisionData: inv.previousRevisionData || null,
           invoiceUrl: inv.invoiceUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
           lineItems: inv.lineItems || [],
           vendorGstin: inv.vendorGstin || '',
@@ -94,43 +100,30 @@ export function ApprovalQueue() {
   }, [filter, searchQuery])
 
   const openRejectModal = (item) => {
-    setRejectingInvoice(item)
-    setRejectionReasonText('')
-    setRejectionError('')
+    setSelectedInvoiceToReject(item)
+    setIsRejectModalOpen(true)
   }
 
-  const handleConfirmReject = async () => {
-    if (!rejectionReasonText.trim()) {
-      setRejectionError('Rejection reason is required. Please state why this invoice is being rejected.')
-      return
-    }
-
-    const item = rejectingInvoice
+  const handleConfirmReject = async ({ rejectionReason, rejectionComment, relatedInvoiceId }) => {
+    const item = selectedInvoiceToReject
     if (!item) return
 
     try {
       if (item._id && !item._id.startsWith('inv-demo')) {
-        await api.put(`/invoices/${item._id}`, {
-          status: 'Rejected',
-          rejectionReason: rejectionReasonText.trim(),
-          comments: [rejectionReasonText.trim()],
+        await api.put(`/invoices/${item._id}/reject`, {
+          rejectionReason,
+          rejectionComment,
+          relatedInvoiceId,
         })
       }
-      setQueue((prev) =>
-        prev.map((i) =>
-          i._id === item._id
-            ? { ...i, status: 'Rejected', rejectionReason: rejectionReasonText.trim() }
-            : i
-        )
-      )
-      showToast(`Invoice #${item.invoiceNumber || item.id} rejected with recorded reason.`, 'success')
+      showToast(`Invoice #${item.invoiceNumber || item.id} rejection status updated`, 'success')
+      fetchInvoices()
     } catch (err) {
       console.error('Failed to reject invoice:', err)
-      showToast('Invoice rejected', 'success')
+      showToast(err.response?.data?.message || 'Failed to record rejection', 'danger')
     } finally {
-      setRejectingInvoice(null)
-      setRejectionReasonText('')
-      setRejectionError('')
+      setSelectedInvoiceToReject(null)
+      setIsRejectModalOpen(false)
       setSelectedModalInvoice(null)
     }
   }
@@ -165,22 +158,24 @@ export function ApprovalQueue() {
     }
   }
 
+  const duplicateCount = useMemo(() => queue.filter((i) => i.duplicate || i.aiFlag === 'Duplicate Risk').length, [queue])
+
   const filteredQueue = useMemo(() => {
     return queue.filter((item) => {
-      if (item.duplicate || item.status === 'Draft' || item.aiFlag === 'Duplicate Risk') {
-        return false
-      }
+      if (item.status === 'Draft') return false
 
-      const matchesFilter =
-        filter === 'All'
-          ? true
-          : filter === 'Pending'
-          ? item.status === 'Pending'
-          : filter === 'Approved'
-          ? item.status === 'Approved'
-          : filter === 'Rejected'
-          ? item.status === 'Rejected'
-          : item.status === filter
+      let matchesFilter = true
+      if (filter === 'Pending') {
+        matchesFilter = item.status === 'Pending' && !item.duplicate && item.aiFlag !== 'Duplicate Risk'
+      } else if (filter === 'Duplicate Risk') {
+        matchesFilter = Boolean(item.duplicate) || item.aiFlag === 'Duplicate Risk'
+      } else if (filter === 'Approved') {
+        matchesFilter = item.status === 'Approved'
+      } else if (filter === 'Rejected') {
+        matchesFilter = item.status === 'Rejected'
+      } else if (filter === 'All') {
+        matchesFilter = true
+      }
 
       const matchesSearch =
         (item.vendorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -201,6 +196,7 @@ export function ApprovalQueue() {
     const pendingInvoices = queue.filter((i) => i.status === 'Pending' && !i.duplicate)
     return calculateMultiCurrencyTotals(pendingInvoices)
   }, [queue])
+
 
   return (
     <div className="space-y-6 pb-8">
@@ -258,6 +254,7 @@ export function ApprovalQueue() {
         <div className="flex flex-wrap items-center gap-1">
           {[
             { id: 'Pending', label: `Pending (${pendingCount})` },
+            { id: 'Duplicate Risk', label: `Duplicate Risk (${duplicateCount})` },
             { id: 'All', label: 'All Invoices' },
             { id: 'Approved', label: 'Approved' },
             { id: 'Rejected', label: 'Rejected' },
@@ -311,64 +308,129 @@ export function ApprovalQueue() {
               </tr>
             ) : (
               paginatedQueue.map((item) => (
-                <tr key={item._id} className="hover:bg-slate-50/60 transition">
-                  <td className="py-3 px-4 font-mono font-bold text-blue-600">{item.invoiceNumber}</td>
-                  <td className="py-3 px-4">
-                    <p className="font-extrabold text-slate-900">{item.vendorName}</p>
-                    <p className="text-[10px] text-slate-400">{item.category}</p>
-                  </td>
-                  <td className="py-3 px-4 text-slate-600 font-medium">{item.submittedBy}</td>
-                  <td className="py-3 px-4 text-right font-black text-slate-900">
-                    {formatCurrency(item.totalAmount || item.amount || 0, item.currency)}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                      <Sparkles className="h-2.5 w-2.5" /> {item.confidenceScore}%
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                        item.status === 'Approved'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : item.status === 'Rejected'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => setSelectedModalInvoice(item)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
-                      >
-                        <Eye className="h-3.5 w-3.5 text-blue-600" /> Review
-                      </button>
-
-                      {item.status === 'Pending' && isManager && (
-                        <>
-                          <button
-                            onClick={() => handleAction(item, 'Approved')}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
-                            title="Approve Invoice"
-                          >
-                            <Check className="h-3.5 w-3.5 stroke-[3]" /> Approve
-                          </button>
-                          <button
-                            onClick={() => handleAction(item, 'Rejected')}
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
-                            title="Reject Invoice"
-                          >
-                            <X className="h-3.5 w-3.5 stroke-[3]" /> Reject
-                          </button>
-                        </>
+                <Fragment key={item._id}>
+                  <tr className="hover:bg-slate-50/60 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-blue-600">{item.invoiceNumber}</td>
+                    <td className="py-3 px-4">
+                      <p className="font-extrabold text-slate-900">{item.vendorName}</p>
+                      <p className="text-[10px] text-slate-400">{item.category}</p>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 font-medium">{item.submittedBy}</td>
+                    <td className="py-3 px-4 text-right font-black text-slate-900">
+                      {formatCurrency(item.totalAmount || item.amount || 0, item.currency)}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
+                        <Sparkles className="h-2.5 w-2.5" /> {item.confidenceScore}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {item.duplicate || item.aiFlag === 'Duplicate Risk' ? (
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800">
+                            <AlertTriangle className="h-3 w-3 text-rose-600" /> Duplicate Risk
+                          </span>
+                          <span className="text-[9px] font-black text-rose-700 uppercase">
+                            {item.matchedInvoice?.status || 'WAS ALREADY PAID'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                            item.status === 'Approved' || item.status === 'PAYMENT_QUEUE'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : item.status === 'NEEDS_CORRECTION' || item.status === 'Rejected'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : item.status === 'DUPLICATE_SUBMISSION'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                              : item.status === 'ALREADY_PAID'
+                              ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                              : item.revisionNumber > 1 && item.status === 'Pending'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {item.status === 'Pending' && item.revisionNumber > 1
+                            ? `Resubmitted (Rev ${item.revisionNumber})`
+                            : item.status === 'NEEDS_CORRECTION' || item.status === 'Rejected'
+                            ? 'Needs Correction'
+                            : item.status === 'DUPLICATE_SUBMISSION'
+                            ? 'Duplicate Submission'
+                            : item.status === 'ALREADY_PAID'
+                            ? 'Already Paid'
+                            : item.status}
+                        </span>
                       )}
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          to={`/app/invoice/${item._id}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+                        >
+                          <Eye className="h-3.5 w-3.5 text-blue-600" /> Review
+                        </Link>
+
+                        {item.status === 'Pending' && isManager && (
+                          <>
+                            <button
+                              onClick={() => handleAction(item, 'Approved')}
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                              title="Approve Invoice"
+                            >
+                              <Check className="h-3.5 w-3.5 stroke-[3]" /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleAction(item, 'Rejected')}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                              title="Reject Invoice"
+                            >
+                              <X className="h-3.5 w-3.5 stroke-[3]" /> Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* DUPLICATE RISK DETAILS SUB-ROW */}
+                  {(item.duplicate || item.aiFlag === 'Duplicate Risk') && (
+                    <tr className="bg-rose-50/60 border-b border-rose-100">
+                      <td colSpan={7} className="px-4 py-2.5 text-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl bg-white p-3 border border-rose-200 shadow-2xs">
+                          <div className="flex items-start sm:items-center gap-2.5 text-rose-950">
+                            <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5 sm:mt-0" />
+                            <div className="space-y-0.5">
+                              <p className="font-extrabold text-xs">
+                                Duplication Result:{' '}
+                                <span className="uppercase text-rose-800 bg-rose-100 px-2 py-0.5 rounded font-black border border-rose-200">
+                                  {item.matchedInvoice?.status || 'WAS ALREADY PAID'}
+                                </span>{' '}
+                                • Submitted By:{' '}
+                                <span className="text-slate-900 font-bold">
+                                  {item.matchedInvoice?.sentBy || item.matchedInvoice?.submittedBy || 'Finance Executive'}
+                                </span>
+                              </p>
+                              <p className="text-[11px] text-slate-700 font-medium">
+                                Proper Reason:{' '}
+                                <span className="italic">
+                                  {item.matchedInvoice?.reason || `Exact match found for Invoice #${item.invoiceNumber} from ${item.vendorName}.`}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <Link
+                            to={`/app/invoice/${item._id}`}
+                            className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-rose-700 transition shrink-0 self-start sm:self-center"
+                          >
+                            Inspect Duplicate Flag →
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))
             )}
           </tbody>
@@ -508,68 +570,13 @@ export function ApprovalQueue() {
         </div>
       )}
 
-      {/* REJECTION REASON REQUIRED MODAL */}
-      {rejectingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
-          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4 border border-rose-100 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-rose-100 pb-3">
-              <div className="flex items-center gap-2 text-rose-600">
-                <XCircle className="h-5 w-5" />
-                <h3 className="text-base font-extrabold text-slate-900">Rejection Reason Required</h3>
-              </div>
-              <button
-                onClick={() => setRejectingInvoice(null)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-xs text-slate-600 font-medium">
-                Rejecting Invoice <strong className="text-slate-900 font-mono">#{rejectingInvoice.invoiceNumber || rejectingInvoice.id}</strong> from <strong className="text-slate-900">{rejectingInvoice.vendorName}</strong>.
-              </p>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Reason for Rejection <span className="text-rose-500">*</span>
-              </label>
-              <textarea
-                value={rejectionReasonText}
-                onChange={(e) => {
-                  setRejectionReasonText(e.target.value)
-                  if (e.target.value.trim()) setRejectionError('')
-                }}
-                placeholder="Explain why this invoice is rejected (e.g., Mismatched PO total, invalid GSTIN, missing item breakdown)..."
-                rows={3}
-                className={`w-full resize-none rounded-2xl border ${
-                  rejectionError ? 'border-rose-500 bg-rose-50/30' : 'border-slate-200 bg-slate-50'
-                } p-3 text-xs font-semibold text-slate-900 outline-none focus:border-rose-500 focus:bg-white transition`}
-                autoFocus
-              />
-              {rejectionError && (
-                <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  <span>{rejectionError}</span>
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
-              <button
-                onClick={() => setRejectingInvoice(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmReject}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 transition"
-              >
-                Confirm Rejection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* SHADCN/UI BASED REJECT INVOICE MODAL */}
+      <RejectInvoiceModal
+        isOpen={isRejectModalOpen}
+        onClose={() => setIsRejectModalOpen(false)}
+        invoice={selectedInvoiceToReject}
+        onConfirm={handleConfirmReject}
+      />
     </div>
   )
 }

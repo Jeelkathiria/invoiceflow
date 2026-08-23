@@ -7,7 +7,11 @@ import { UploadInvoice } from '../pages/UploadInvoice'
 import { InvoiceDetails } from '../pages/InvoiceDetails'
 import { ApprovalQueue } from '../pages/ApprovalQueue'
 import { AllInvoices } from '../pages/AllInvoices'
+import { PaymentQueue } from '../pages/PaymentQueue'
+import { PaymentHistory } from '../pages/PaymentHistory'
 import { Profile } from '../pages/Profile'
+import { FinanceTeam } from '../pages/FinanceTeam'
+import { FinanceMemberDetails } from '../pages/FinanceMemberDetails'
 import { Unauthorized } from '../pages/Unauthorized'
 import { MainLayout } from '../layouts/MainLayout'
 import { AuthLayout } from '../layouts/AuthLayout'
@@ -47,6 +51,10 @@ export function AppRoutes() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<AuthLayout><Login /></AuthLayout>} />
       <Route path="/signup" element={<AuthLayout><Signup /></AuthLayout>} />
+
+      {/* Redirect helpers for top-level paths /manager/team and /manager/team/:userId */}
+      <Route path="/manager/team" element={<Navigate to="/app/manager/team" replace />} />
+      <Route path="/manager/team/:userId" element={<Navigate to="/app/manager/team/:userId" replace />} />
       
       {/* Protected App Routes */}
       <Route
@@ -69,12 +77,50 @@ export function AppRoutes() {
           }
         />
         
-        {/* Manager Restricted Route */}
+        {/* Manager Restricted Routes */}
         <Route
           path="approval-queue"
           element={
             <RoleProtectedRoute allowedRoles={['manager']}>
               <ApprovalQueue />
+            </RoleProtectedRoute>
+          }
+        />
+
+        <Route
+          path="manager/team"
+          element={
+            <RoleProtectedRoute allowedRoles={['manager']}>
+              <FinanceTeam />
+            </RoleProtectedRoute>
+          }
+        />
+
+        <Route
+          path="manager/team/:userId"
+          element={
+            <RoleProtectedRoute allowedRoles={['manager']}>
+              <FinanceMemberDetails />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Payment Queue Route */}
+        <Route
+          path="payment-queue"
+          element={
+            <RoleProtectedRoute allowedRoles={['finance', 'manager']}>
+              <PaymentQueue />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Payment History Route */}
+        <Route
+          path="payment-history"
+          element={
+            <RoleProtectedRoute allowedRoles={['finance', 'manager']}>
+              <PaymentHistory />
             </RoleProtectedRoute>
           }
         />

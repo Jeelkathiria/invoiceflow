@@ -17,8 +17,32 @@ export const approveInvoice = async (invoiceId, userId, comment = '') => {
     throw error
   }
 
-  invoice.status = 'Approved'
+  let managerName = 'Manager'
+  let managerRole = 'Manager'
+  if (userId) {
+    const manager = await User.findById(userId)
+    if (manager?.name) managerName = manager.name
+    if (manager?.role) managerRole = manager.role
+  }
+
+  const prevStatus = invoice.status || 'Pending'
+  invoice.status = 'PAYMENT_QUEUE'
+  invoice.paymentStatus = 'PAYMENT_PENDING'
   invoice.approvedBy = userId
+
+  if (!Array.isArray(invoice.approvalHistory)) invoice.approvalHistory = []
+  invoice.approvalHistory.push({
+    action: 'APPROVED',
+    previousStatus: prevStatus,
+    newStatus: 'PAYMENT_QUEUE',
+    performedBy: userId || null,
+    performedByName: managerName,
+    performedByRole: managerRole,
+    comment: comment || 'Invoice approved and added to Payment Queue',
+    revisionNumber: invoice.revisionNumber || 1,
+    timestamp: new Date(),
+  })
+
   await invoice.save()
 
   // Create Audit Log
@@ -26,23 +50,16 @@ export const approveInvoice = async (invoiceId, userId, comment = '') => {
     invoiceId: invoice._id,
     performedBy: userId,
     action: 'Approved',
-    comment: comment || 'Invoice approved for settlement',
+    comment: comment || 'Invoice approved and added to Payment Queue',
   })
 
   // Create Notification specifically for Finance users with Manager name
   try {
-    let managerName = 'Manager'
-    if (userId) {
-      const manager = await User.findById(userId)
-      if (manager?.name) managerName = manager.name
-    }
-    const sym = (invoice.currency === 'USD' || invoice.currency === '$') ? '$' : '₹'
-
     await Notification.create({
-      title: 'Invoice Approved',
-      message: `${managerName} approved Invoice #${invoice.invoiceNumber} from ${invoice.vendorName || 'Vendor'} (${sym}${(invoice.amount || 0).toLocaleString()}).`,
-      type: 'success',
-      link: '/app/invoices',
+      title: 'Manager Approved (Payment Pending)',
+      message: `Invoice ${invoice.invoiceNumber} was approved by ${managerName} and sent to the Payment Queue. Pending Finance department payment confirmation.`,
+      type: 'info',
+      link: '/app/payment-queue',
       recipientRole: 'finance',
       user: invoice.uploadedBy || null,
     })

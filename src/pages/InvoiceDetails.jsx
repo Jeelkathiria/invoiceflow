@@ -5,7 +5,6 @@ import api from '../services/axios'
 import { DocumentViewer } from '../components/DocumentViewer'
 import {
   ArrowLeft,
-  Download,
   Printer,
   Check,
   X,
@@ -15,13 +14,25 @@ import {
   Clock,
   XCircle,
   FileText,
-  Save,
   Send,
   MessageSquare,
-  Loader2
+  Loader2,
+  Building2,
+  UserCheck,
+  FileCheck,
+  AlertTriangle,
+  Edit3,
+  Plus,
+  Trash2,
+  RefreshCw,
+  History,
+  RotateCcw,
+  CreditCard,
+  ExternalLink,
 } from 'lucide-react'
 
 import { formatCurrency } from '../utils/formatCurrency'
+import { RejectInvoiceModal } from '../components/invoice/RejectInvoiceModal'
 
 export function InvoiceDetails() {
   const { user } = useAuth()
@@ -35,32 +46,53 @@ export function InvoiceDetails() {
   const [invoice, setInvoice] = useState(null)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('Pending')
-  const [auditLogs, setAuditLogs] = useState([])
   const [managerComment, setManagerComment] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
-  const [vendorName, setVendorName] = useState('')
   const [toast, setToast] = useState(null)
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+
+  // FIX & RESUBMIT INLINE EDITING STATE
+  const [isEditing, setIsEditing] = useState(false)
+  const [resubmitLoading, setResubmitLoading] = useState(false)
+  const [resubmitError, setResubmitError] = useState('')
+
+  const [formVendorName, setFormVendorName] = useState('')
+  const [formVendorGstin, setFormVendorGstin] = useState('')
+  const [formInvoiceNumber, setFormInvoiceNumber] = useState('')
+  const [formPoNumber, setFormPoNumber] = useState('')
+  const [formInvoiceDate, setFormInvoiceDate] = useState('')
+  const [formDueDate, setFormDueDate] = useState('')
+  const [formCurrency, setFormCurrency] = useState('INR')
+  const [formPaymentTerms, setFormPaymentTerms] = useState('Net 30')
+  const [formNotes, setFormNotes] = useState('')
+
+  const [formSubtotal, setFormSubtotal] = useState(0)
+  const [formGst, setFormGst] = useState(0)
+  const [formCgst, setFormCgst] = useState(0)
+  const [formSgst, setFormSgst] = useState(0)
+  const [formIgst, setFormIgst] = useState(0)
+  const [formDiscount, setFormDiscount] = useState(0)
+  const [formGrandTotal, setFormGrandTotal] = useState(0)
+
+  const [formLineItems, setFormLineItems] = useState([])
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)
   }
 
-  // Dynamically fetch live invoice from MongoDB
+  // Fetch invoice details from MongoDB
   const fetchInvoiceData = async () => {
     if (!invoiceId) return
     setLoading(true)
     try {
       let resData = null
 
-      // First attempt direct fetch by MongoDB _id
       try {
         const res = await api.get(`/invoices/${invoiceId}`)
         if (res.data && res.data.data) {
           resData = res.data.data
         }
       } catch (err) {
-        // Fallback: search in invoices array by invoiceNumber or _id
         const listRes = await api.get('/invoices')
         if (listRes.data && listRes.data.data && Array.isArray(listRes.data.data.invoices)) {
           resData = listRes.data.data.invoices.find(
@@ -70,73 +102,80 @@ export function InvoiceDetails() {
       }
 
       if (resData) {
+        const rawDate = resData.invoiceDate ? new Date(resData.invoiceDate).toISOString().split('T')[0] : ''
+        const rawDue = resData.dueDate ? new Date(resData.dueDate).toISOString().split('T')[0] : ''
+
         const formattedInvoice = {
           _id: resData._id,
           id: resData.invoiceNumber || resData._id,
           invoiceNumber: resData.invoiceNumber || 'INV-001',
-          vendor: resData.vendorName || 'Unknown Vendor',
+          poNumber: resData.poNumber || 'N/A',
           vendorName: resData.vendorName || 'Unknown Vendor',
-          vendorGstin: resData.vendorGstin || '',
-          category: resData.category || 'General Expense',
-          invoiceDate: resData.invoiceDate ? new Date(resData.invoiceDate).toLocaleDateString() : '-',
-          dueDate: resData.dueDate ? new Date(resData.dueDate).toLocaleDateString() : '-',
-          paymentTerms: 'Net 15',
-          submittedBy: resData.uploadedBy?.name || 'Finance Executive',
-          confidence: resData.confidenceScore || 95.0,
+          vendorGstin: resData.vendorGstin || 'N/A',
+          buyerName: resData.buyerName || 'InvoiceFlow Enterprise',
+          buyerGstin: resData.buyerGstin || '27AAAAA0000A1Z5',
+          category: resData.category || 'General Operations',
+          invoiceDate: resData.invoiceDate ? (typeof resData.invoiceDate === 'string' && !resData.invoiceDate.includes('T') ? resData.invoiceDate : new Date(resData.invoiceDate).toLocaleDateString()) : '-',
+          dueDate: resData.dueDate ? (typeof resData.dueDate === 'string' && !resData.dueDate.includes('T') ? resData.dueDate : new Date(resData.dueDate).toLocaleDateString()) : '-',
+          rawInvoiceDate: rawDate,
+          rawDueDate: rawDue,
+          paymentTerms: resData.paymentTerms || 'Net 30',
+          submittedBy: 'Finance Executive',
+          approvedBy: resData.approvedBy?.name || 'Finance Manager',
+          uploadedBy: resData.uploadedBy,
+          confidenceScore: resData.confidenceScore || resData.ocrConfidence || 95.0,
+          extractionSource: resData.extractionSource || 'OCR',
           status: resData.status || 'Pending',
-          duplicateCheck: resData.duplicate ? 'Duplicate Flagged' : 'Passed (Clean Record)',
+          revisionNumber: resData.revisionNumber || 1,
+          duplicate: Boolean(resData.duplicate),
+          matchedInvoice: resData.matchedInvoice || null,
           subtotal: resData.subtotal || Math.round((resData.amount || 0) * 0.85),
           gstAmount: resData.gst || Math.round((resData.amount || 0) * 0.15),
+          cgst: resData.cgst || 0,
+          sgst: resData.sgst || 0,
+          igst: resData.igst || 0,
+          discount: resData.discount || 0,
           totalAmount: resData.amount || resData.totalAmount || 0,
           currency: resData.currency || 'INR',
-          invoiceUrl: resData.invoiceUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+          notes: resData.notes || '',
+          invoiceUrl: resData.invoiceUrl || '',
           lineItems: (resData.lineItems && resData.lineItems.length > 0)
             ? resData.lineItems.map((item, idx) => ({
                 id: item._id || idx + 1,
-                desc: item.description || item.desc || 'Services / Products Rendered',
-                qty: item.quantity || item.qty || 1,
-                rate: item.unitPrice || item.rate || resData.amount || 0,
-                total: item.amount || item.total || (item.quantity || 1) * (item.unitPrice || resData.amount || 0),
+                description: item.description || item.desc || 'Line Item',
+                quantity: item.quantity || 1,
+                unitPrice: item.unitPrice || 0,
+                taxRate: item.taxRate || 0,
+                taxAmount: item.taxAmount || item.tax || 0,
+                total: item.amount || item.total || ((item.quantity || 1) * (item.unitPrice || 0)),
               }))
             : [
                 {
                   id: 1,
-                  desc: `${resData.category || 'Vendor Services'} - ${resData.vendorName || 'Primary Invoice Line'}`,
-                  qty: 1,
-                  rate: Math.round((resData.amount || 0) * 0.85),
-                  total: Math.round((resData.amount || 0) * 0.85),
+                  description: `${resData.category || 'General'} - Line Item 1`,
+                  quantity: 1,
+                  unitPrice: Math.round((resData.amount || 0) * 0.85),
+                  taxRate: 18,
+                  taxAmount: Math.round((resData.amount || 0) * 0.15),
+                  total: resData.amount || 0,
                 },
               ],
-          comments: resData.comments || [],
+          rejectionReason: resData.rejectionReason || '',
+          rejectionComment: resData.rejectionComment || '',
+          relatedInvoiceId: resData.relatedInvoiceId || null,
+          rejectedBy: resData.rejectedBy,
+          rejectedAt: resData.rejectedAt,
+          paidBy: resData.paidBy?.name || resData.paidBy || 'Finance User',
+          paidAt: resData.paidAt ? new Date(resData.paidAt).toLocaleString() : '',
+          paymentStatus: resData.paymentStatus || 'UNPAID',
+          previousRevisionData: resData.previousRevisionData || null,
+          approvalHistory: resData.approvalHistory || [],
+          createdAt: resData.createdAt ? new Date(resData.createdAt).toLocaleString() : new Date().toLocaleDateString(),
+          updatedAt: resData.updatedAt ? new Date(resData.updatedAt).toLocaleString() : new Date().toLocaleDateString(),
         }
 
         setInvoice(formattedInvoice)
         setStatus(formattedInvoice.status)
-        setVendorName(formattedInvoice.vendor)
-
-        // Build dynamic audit log from invoice history
-        const initialLogs = [
-          {
-            time: formattedInvoice.invoiceDate,
-            event: 'Invoice Document Ingested & Saved in System',
-            user: formattedInvoice.submittedBy,
-          },
-          {
-            time: formattedInvoice.invoiceDate,
-            event: `AI Field Extraction Completed (${formattedInvoice.confidence}% Accuracy)`,
-            user: 'Gemini AI Engine',
-          },
-        ]
-        if (formattedInvoice.comments && formattedInvoice.comments.length > 0) {
-          formattedInvoice.comments.forEach((c) => {
-            initialLogs.push({
-              time: 'Recent Action',
-              event: `Comment Added: "${c}"`,
-              user: 'Manager',
-            })
-          })
-        }
-        setAuditLogs(initialLogs)
       } else {
         showToast('Invoice document not found', 'error')
       }
@@ -152,6 +191,139 @@ export function InvoiceDetails() {
     fetchInvoiceData()
   }, [invoiceId])
 
+  // Populate inline edit state when starting correction
+  const startEditing = () => {
+    if (!invoice) return
+    setFormVendorName(invoice.vendorName || '')
+    setFormVendorGstin(invoice.vendorGstin !== 'N/A' ? invoice.vendorGstin : '')
+    setFormInvoiceNumber(invoice.invoiceNumber || '')
+    setFormPoNumber(invoice.poNumber !== 'N/A' ? invoice.poNumber : '')
+    setFormInvoiceDate(invoice.rawInvoiceDate || '')
+    setFormDueDate(invoice.rawDueDate || '')
+    setFormCurrency(invoice.currency || 'INR')
+    setFormPaymentTerms(invoice.paymentTerms || 'Net 30')
+    setFormNotes(invoice.notes || '')
+
+    setFormSubtotal(invoice.subtotal || 0)
+    setFormGst(invoice.gstAmount || 0)
+    setFormCgst(invoice.cgst || 0)
+    setFormSgst(invoice.sgst || 0)
+    setFormIgst(invoice.igst || 0)
+    setFormDiscount(invoice.discount || 0)
+    setFormGrandTotal(invoice.totalAmount || 0)
+
+    setFormLineItems(
+      invoice.lineItems.map((item) => ({ ...item }))
+    )
+
+    setResubmitError('')
+    setIsEditing(true)
+  }
+
+  // Recalculate line item totals and grand total
+  const updateLineItem = (index, field, value) => {
+    const updated = [...formLineItems]
+    updated[index][field] = value
+
+    const qty = Number(updated[index].quantity) || 0
+    const price = Number(updated[index].unitPrice) || 0
+    const taxRate = Number(updated[index].taxRate) || 0
+
+    const lineSub = qty * price
+    const lineTax = (lineSub * taxRate) / 100
+    updated[index].taxAmount = Math.round(lineTax)
+    updated[index].total = Math.round(lineSub + lineTax)
+
+    setFormLineItems(updated)
+
+    // Recompute header totals
+    const newSub = updated.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unitPrice || 0)), 0)
+    const newTax = updated.reduce((acc, i) => acc + (Number(i.taxAmount) || 0), 0)
+    setFormSubtotal(Math.round(newSub))
+    setFormGst(Math.round(newTax))
+    setFormGrandTotal(Math.round(newSub + newTax - (Number(formDiscount) || 0)))
+  }
+
+  const addLineItem = () => {
+    setFormLineItems((prev) => [
+      ...prev,
+      { id: Date.now(), description: 'New Line Item', quantity: 1, unitPrice: 0, taxRate: 18, taxAmount: 0, total: 0 },
+    ])
+  }
+
+  const removeLineItem = (index) => {
+    if (formLineItems.length <= 1) return
+    const updated = formLineItems.filter((_, i) => i !== index)
+    setFormLineItems(updated)
+
+    const newSub = updated.reduce((acc, i) => acc + (Number(i.quantity || 0) * Number(i.unitPrice || 0)), 0)
+    const newTax = updated.reduce((acc, i) => acc + (Number(i.taxAmount) || 0), 0)
+    setFormSubtotal(Math.round(newSub))
+    setFormGst(Math.round(newTax))
+    setFormGrandTotal(Math.round(newSub + newTax - (Number(formDiscount) || 0)))
+  }
+
+  // Handle Resubmit Submission
+  const handleResubmitInvoice = async () => {
+    setResubmitError('')
+    if (!formVendorName.trim()) {
+      setResubmitError('Vendor Name is required.')
+      return
+    }
+    if (!formInvoiceNumber.trim()) {
+      setResubmitError('Invoice Number is required.')
+      return
+    }
+    if (!formInvoiceDate) {
+      setResubmitError('Invoice Date is required.')
+      return
+    }
+    if (!formGrandTotal || formGrandTotal <= 0) {
+      setResubmitError('Grand Total must be greater than 0.')
+      return
+    }
+
+    setResubmitLoading(true)
+    try {
+      const payload = {
+        vendorName: formVendorName.trim(),
+        vendorGstin: formVendorGstin.trim(),
+        invoiceNumber: formInvoiceNumber.trim(),
+        poNumber: formPoNumber.trim(),
+        invoiceDate: formInvoiceDate,
+        dueDate: formDueDate || undefined,
+        currency: formCurrency,
+        paymentTerms: formPaymentTerms,
+        notes: formNotes,
+        subtotal: formSubtotal,
+        gst: formGst,
+        cgst: formCgst,
+        sgst: formSgst,
+        igst: formIgst,
+        discount: formDiscount,
+        amount: formGrandTotal,
+        lineItems: formLineItems.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: item.taxRate,
+          taxAmount: item.taxAmount,
+          amount: item.total,
+        })),
+      }
+
+      await api.put(`/invoices/${invoice._id}/resubmit`, payload)
+      showToast('Invoice corrected & resubmitted for approval!', 'success')
+      setIsEditing(false)
+      fetchInvoiceData()
+    } catch (err) {
+      console.error('Resubmit error:', err)
+      setResubmitError(err.response?.data?.message || 'Failed to resubmit invoice. Please check fields.')
+    } finally {
+      setResubmitLoading(false)
+    }
+  }
+
   const handleApprove = async () => {
     if (!isManager || !invoice) return
     const newStatus = 'Approved'
@@ -163,93 +335,29 @@ export function InvoiceDetails() {
         })
       }
       setStatus(newStatus)
-      setAuditLogs((prev) => [
-        ...prev,
-        {
-          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          event: managerComment ? `Approved with Comment: "${managerComment}"` : 'Authorized & Approved for Settlement',
-          user: user?.name || 'Manager',
-        },
-      ])
       showToast('Invoice Approved successfully!', 'success')
+      fetchInvoiceData()
     } catch (err) {
       console.error('Approve failed:', err)
       showToast('Approved status saved', 'success')
-      setStatus(newStatus)
     }
   }
 
-  const handleReject = async () => {
+  const handleConfirmReject = async ({ rejectionReason, rejectionComment, relatedInvoiceId }) => {
     if (!isManager || !invoice) return
-    const newStatus = 'Rejected'
     try {
       if (invoice._id) {
-        await api.put(`/invoices/${invoice._id}`, {
-          status: newStatus,
-          comments: managerComment ? [managerComment] : [],
+        await api.put(`/invoices/${invoice._id}/reject`, {
+          rejectionReason,
+          rejectionComment,
+          relatedInvoiceId,
         })
       }
-      setStatus(newStatus)
-      setAuditLogs((prev) => [
-        ...prev,
-        {
-          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          event: managerComment ? `Rejected with Comment: "${managerComment}"` : 'Invoice Rejected by Manager',
-          user: user?.name || 'Manager',
-        },
-      ])
-      showToast('Invoice Rejected', 'error')
+      showToast('Invoice rejection processed successfully', 'success')
+      fetchInvoiceData()
     } catch (err) {
       console.error('Reject failed:', err)
-      setStatus(newStatus)
-      showToast('Status updated to Rejected', 'error')
-    }
-  }
-
-  const handleSaveDraft = async () => {
-    if (!isFinance || status !== 'Draft' || !invoice) return
-    try {
-      if (invoice._id) {
-        await api.put(`/invoices/${invoice._id}`, {
-          vendorName: vendorName,
-          status: 'Draft',
-        })
-      }
-      setInvoice((prev) => ({ ...prev, vendor: vendorName, vendorName: vendorName }))
-      setIsEditing(false)
-      showToast('Draft changes saved!', 'info')
-    } catch (err) {
-      console.error('Save draft error:', err)
-      setInvoice((prev) => ({ ...prev, vendor: vendorName }))
-      setIsEditing(false)
-      showToast('Draft saved', 'info')
-    }
-  }
-
-  const handleSendForApproval = async () => {
-    if (!isFinance || !invoice) return
-    const newStatus = 'Pending'
-    try {
-      if (invoice._id) {
-        await api.put(`/invoices/${invoice._id}`, {
-          status: newStatus,
-          vendorName: vendorName || invoice.vendor,
-        })
-      }
-      setStatus(newStatus)
-      setAuditLogs((prev) => [
-        ...prev,
-        {
-          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          event: 'Submitted to Manager Approval Queue',
-          user: user?.name || 'Finance Executive',
-        },
-      ])
-      showToast('Invoice sent to Manager for Approval!', 'success')
-    } catch (err) {
-      console.error('Send for approval failed:', err)
-      setStatus(newStatus)
-      showToast('Invoice submitted for approval!', 'success')
+      showToast(err.response?.data?.message || 'Rejection failed', 'error')
     }
   }
 
@@ -273,14 +381,23 @@ export function InvoiceDetails() {
           <p className="text-xs text-slate-500">No matching invoice found for ID: {invoiceId}</p>
         </div>
         <Link
-          to="/app"
+          to="/app/invoices"
           className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
         >
-          Return to Dashboard
+          Return to All Invoices
         </Link>
       </div>
     )
   }
+
+  // Check if current user is owner of invoice
+  const isOwner =
+    !invoice.uploadedBy ||
+    invoice.uploadedBy === user?._id ||
+    invoice.uploadedBy === user?.id ||
+    (user?.email && invoice.uploadedBy?.email === user?.email)
+
+  const isResubmitted = invoice.revisionNumber > 1 || status === 'Pending' && invoice.previousRevisionData
 
   return (
     <div className="space-y-6 pb-8">
@@ -304,7 +421,7 @@ export function InvoiceDetails() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
@@ -312,287 +429,928 @@ export function InvoiceDetails() {
 
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-bold text-blue-600 text-sm">{invoice.id}</span>
+              <span className="font-mono font-bold text-blue-600 text-sm">#{invoice.invoiceNumber}</span>
+              
+              {/* Revision Number Badge */}
+              <span className="rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-mono font-extrabold text-slate-700">
+                Revision {invoice.revisionNumber || 1}
+              </span>
+
+              {/* Status Badge */}
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                  status === 'Approved'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : status === 'Rejected'
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                    : status === 'Draft'
-                    ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                  status === 'PAID' || status === 'Paid'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : status === 'PAYMENT_QUEUE' || status === 'Approved'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    : status === 'NEEDS_CORRECTION' || status === 'Rejected'
+                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                    : status === 'DUPLICATE_SUBMISSION'
+                    ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                    : status === 'ALREADY_PAID'
+                    ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                    : isResubmitted
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
                     : 'bg-amber-50 text-amber-700 border border-amber-200'
                 }`}
               >
-                {status === 'Approved' ? (
-                  <CheckCircle2 className="h-3 w-3" />
-                ) : status === 'Rejected' ? (
+                {status === 'PAID' || status === 'Paid' ? (
+                  <CheckCircle2 className="h-3 w-3 stroke-[2.5]" />
+                ) : status === 'PAYMENT_QUEUE' || status === 'Approved' ? (
+                  <CreditCard className="h-3 w-3" />
+                ) : status === 'NEEDS_CORRECTION' || status === 'Rejected' ? (
+                  <AlertTriangle className="h-3 w-3 text-amber-600" />
+                ) : status === 'DUPLICATE_SUBMISSION' || status === 'ALREADY_PAID' ? (
                   <XCircle className="h-3 w-3" />
+                ) : isResubmitted ? (
+                  <RefreshCw className="h-3 w-3" />
                 ) : (
                   <Clock className="h-3 w-3" />
                 )}
-                {status}
+                {status === 'PAID' || status === 'Paid'
+                  ? 'PAID'
+                  : status === 'PAYMENT_QUEUE'
+                  ? 'Payment Queue'
+                  : status === 'NEEDS_CORRECTION' || status === 'Rejected'
+                  ? 'Needs Correction'
+                  : status === 'DUPLICATE_SUBMISSION'
+                  ? 'Duplicate Submission'
+                  : status === 'ALREADY_PAID'
+                  ? 'Already Paid'
+                  : isResubmitted && status === 'Pending'
+                  ? 'Resubmitted'
+                  : status}
               </span>
             </div>
-
-            {isEditing && isFinance && status === 'Draft' ? (
-              <input
-                type="text"
-                value={vendorName}
-                onChange={(e) => setVendorName(e.target.value)}
-                className="mt-1 rounded-lg border border-blue-500 bg-white px-2 py-1 text-lg font-black text-slate-900 outline-none"
-              />
-            ) : (
-              <h1 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">{invoice.vendor}</h1>
-            )}
+            <h1 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">{invoice.vendorName}</h1>
           </div>
         </div>
 
-        {/* Action Buttons according to Role */}
+        {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* MANAGER CONTROLS: Approve & Reject */}
-          {isManager && status === 'Pending' && (
+          {/* MANAGER ACTIONS */}
+          {isManager && (status === 'Pending' || status === 'PENDING_APPROVAL') && (
             <>
               <button
                 onClick={handleApprove}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer"
               >
                 <Check className="h-4 w-4 stroke-[3]" />
-                <span>Approve</span>
+                <span>Approve Invoice</span>
               </button>
 
               <button
-                onClick={handleReject}
-                className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 active:scale-95"
+                onClick={() => setIsRejectModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 active:scale-95 cursor-pointer"
               >
                 <X className="h-4 w-4 stroke-[3]" />
-                <span>Reject</span>
+                <span>Reject Invoice</span>
               </button>
             </>
           )}
 
-          {/* FINANCE CONTROLS: Edit, Save Draft, Send for Approval */}
-          {isFinance && status === 'Draft' && (
-            <>
-              {!isEditing ? (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  <span>Edit Fields</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleSaveDraft}
-                  className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>Save Draft</span>
-                </button>
-              )}
-
-              <button
-                onClick={handleSendForApproval}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>Send for Approval</span>
-              </button>
-            </>
-          )}
-
-          {invoice.invoiceUrl && (
-            <a
-              href={invoice.invoiceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          {/* FINANCE REJECTED / FIX & RESUBMIT BUTTON */}
+          {isFinance && (status === 'NEEDS_CORRECTION' || status === 'Rejected') && isOwner && !isEditing && (
+            <button
+              onClick={startEditing}
+              className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-amber-700 cursor-pointer animate-pulse"
             >
-              <Download className="h-3.5 w-3.5" />
-              <span>Open Original File</span>
-            </a>
+              <Edit3 className="h-4 w-4" />
+              <span>Fix & Resubmit</span>
+            </button>
           )}
 
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50"
           >
             <Printer className="h-3.5 w-3.5" />
-            <span>Print</span>
+            <span>Print Bill</span>
           </button>
         </div>
       </div>
 
-      {/* PROMINENT REJECTION BANNER FOR FINANCE & MANAGER */}
-      {invoice.status === 'Rejected' && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-5 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-rose-700 font-extrabold text-sm">
-              <XCircle className="h-5 w-5 shrink-0 text-rose-600" />
-              <span>Invoice Rejected by Manager</span>
+      {/* DUPLICATION RISK WARNING BANNER FOR MANAGER & AUDITORS */}
+      {(invoice.duplicate || invoice.matchedInvoice) && (
+        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/90 p-5 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-200 pb-3">
+            <div className="flex items-center gap-3 text-rose-950">
+              <AlertTriangle className="h-6 w-6 text-rose-600 shrink-0" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-rose-950">
+                    DUPLICATION RISK DETECTED
+                  </h3>
+                  <span className="rounded-md bg-rose-200 text-rose-900 px-2 py-0.5 text-[10px] font-black uppercase">
+                    {invoice.matchedInvoice?.status || (status === 'PAID' || status === 'Paid' ? 'WAS ALREADY PAID' : 'ALREADY SUBMITTED & PENDING')}
+                  </span>
+                </div>
+                <p className="text-xs text-rose-800 font-medium mt-0.5">
+                  AI engine flagged a matching invoice in MongoDB. Review details below before taking action.
+                </p>
+              </div>
             </div>
-            {invoice.approvedBy?.name && (
-              <span className="text-xs font-semibold text-rose-600 bg-rose-100/70 border border-rose-200 px-3 py-1 rounded-full">
-                Rejected by: <strong>{invoice.approvedBy.name}</strong>
-              </span>
+
+            <div className="text-left sm:text-right text-xs rounded-xl bg-white/90 p-2.5 border border-rose-200 shrink-0">
+              <span className="text-[10px] font-extrabold uppercase text-rose-600 block">Submitted By</span>
+              <p className="font-bold text-slate-900">
+                {invoice.matchedInvoice?.sentBy || invoice.matchedInvoice?.submittedBy || 'Finance Executive'}
+              </p>
+              <p className="text-[10px] text-slate-500 font-medium">Finance Executive Account</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white/80 p-3.5 border border-rose-200 space-y-1.5 text-xs text-slate-800">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-700 block">
+              Duplication Audit Result & Proper Reason:
+            </span>
+            <p className="font-bold text-slate-900">
+              {invoice.matchedInvoice?.reason ||
+                `Duplicate invoice #${invoice.invoiceNumber} for vendor '${invoice.vendorName}' (${formatCurrency(invoice.totalAmount, invoice.currency)}) matches an existing bill previously uploaded by ${invoice.matchedInvoice?.sentBy || 'Finance Executive'}.`}
+            </p>
+            {invoice.matchedInvoice?.paidAt && (
+              <p className="text-[11px] text-emerald-800 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Original Invoice Settlement: Paid on {new Date(invoice.matchedInvoice.paidAt).toLocaleDateString()}</span>
+              </p>
             )}
           </div>
-          <div className="rounded-xl border border-rose-200/80 bg-white p-3.5 text-xs text-slate-800 space-y-1">
-            <p className="font-extrabold text-rose-800 uppercase tracking-wider text-[10px]">
-              Rejection Reason:
-            </p>
-            <p className="font-semibold text-slate-900 leading-relaxed italic">
-              "{invoice.rejectionReason || (invoice.comments && invoice.comments[0]) || 'No specific reason provided.'}"
+        </div>
+      )}
+
+      {/* PAID BANNER */}
+      {(status === 'PAID' || status === 'Paid') && (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-emerald-950">
+            <CheckCircle2 className="h-7 w-7 text-emerald-600 shrink-0 stroke-[2.5]" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-sm uppercase tracking-wider text-emerald-950">PAYMENT COMPLETED & SETTLED</h3>
+                <span className="rounded-md bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[10px] font-black uppercase">Read-Only</span>
+              </div>
+              <p className="text-xs text-emerald-800 mt-0.5">This invoice has been disbursed and marked as paid. Financial values are permanently locked.</p>
+            </div>
+          </div>
+          <div className="text-left sm:text-right text-xs rounded-xl bg-white/80 p-2.5 border border-emerald-200/60 shrink-0">
+            <span className="text-[10px] font-extrabold uppercase text-emerald-700 block">Settlement Info</span>
+            <p className="font-bold text-slate-900">Paid By: <span className="text-emerald-900">{invoice.paidBy}</span></p>
+            <p className="text-[11px] text-slate-600 font-mono">{invoice.paidAt || 'Disbursed'}</p>
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT QUEUE BANNER */}
+      {(status === 'PAYMENT_QUEUE' || (status === 'Approved' && status !== 'PAID')) && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-indigo-950">
+            <CreditCard className="h-6 w-6 text-indigo-600 shrink-0" />
+            <div>
+              <h3 className="font-extrabold text-sm uppercase tracking-wider text-indigo-950">AWAITING PAYMENT (IN PAYMENT QUEUE)</h3>
+              <p className="text-xs text-indigo-800 mt-0.5">Manager approved invoice. Invoice is in the Payment Queue ready for disbursement.</p>
+            </div>
+          </div>
+          {isFinance && (
+            <Link
+              to="/app/payment-queue"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition shrink-0"
+            >
+              <CreditCard className="h-3.5 w-3.5" /> Go to Payment Queue
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* 1. CORRECTION REQUIRED BANNER */}
+      {(status === 'NEEDS_CORRECTION' || status === 'Rejected') && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/80 pb-3">
+            <div className="flex items-center gap-2.5 text-amber-900 font-extrabold text-sm">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <span>INVOICE REJECTED — CORRECTION REQUIRED</span>
+                <p className="text-[11px] font-normal text-amber-800">
+                  Review rejection notes below. Finance user can edit values and resubmit for approval.
+                </p>
+              </div>
+            </div>
+
+            {isFinance && isOwner && !isEditing && (
+              <button
+                onClick={startEditing}
+                className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 cursor-pointer shrink-0"
+              >
+                <Edit3 className="h-4 w-4" />
+                <span>Fix & Resubmit</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 text-xs text-amber-950">
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold uppercase text-amber-700">Rejection Reason</span>
+              <p className="font-extrabold text-sm text-amber-950">Correction Required</p>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold uppercase text-amber-700">Manager Correction Notes</span>
+              <p className="font-medium text-amber-900 italic">
+                {invoice.rejectionComment ? `"${invoice.rejectionComment}"` : 'No additional correction notes provided.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DUPLICATE SUBMISSION BANNER */}
+      {status === 'DUPLICATE_SUBMISSION' && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-200 pb-3">
+            <div className="flex items-center gap-3 text-rose-950">
+              <XCircle className="h-6 w-6 text-rose-600 shrink-0" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-rose-950">
+                    DUPLICATE SUBMISSION — CLOSED
+                  </h3>
+                  <span className="rounded-md bg-rose-200 text-rose-900 px-2 py-0.5 text-[10px] font-black uppercase">
+                    Read-Only
+                  </span>
+                </div>
+                <p className="text-xs text-rose-800 font-medium mt-0.5">
+                  Already submitted through another invoice. This invoice is permanently closed.
+                </p>
+              </div>
+            </div>
+
+            {invoice.relatedInvoiceId && (
+              <Link
+                to={`/app/invoice/${invoice.relatedInvoiceId._id || invoice.relatedInvoiceId}`}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition shrink-0"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>View Related Invoice</span>
+              </Link>
+            )}
+          </div>
+
+          <div className="rounded-xl bg-white/80 p-3.5 border border-rose-200 text-xs space-y-1">
+            <span className="text-[10px] font-extrabold uppercase text-rose-700 block">Related Submission Reference:</span>
+            <p className="font-extrabold text-slate-900">
+              Related Invoice:{' '}
+              <span className="text-rose-900 font-mono font-black">
+                {invoice.relatedInvoiceId?.invoiceNumber || 'INV-1054'}
+              </span>
+              {invoice.relatedInvoiceId?.vendorName && (
+                <span className="font-semibold text-slate-700"> — {invoice.relatedInvoiceId.vendorName}</span>
+              )}
             </p>
           </div>
         </div>
       )}
 
-      {/* Main Split Grid */}
-      <div className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">
-        {/* Left Column: Line Items Table & Original Document Preview */}
-        <div className="space-y-6">
-          {/* Extracted Line Items Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Itemized Line Breakdown</h2>
-              <span className="text-xs font-bold text-slate-400">{invoice.lineItems.length} Line Items Parsed</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/80 text-[10px] font-bold uppercase text-slate-500">
-                    <th className="py-2.5 px-3">Item Description</th>
-                    <th className="py-2.5 px-3 text-center">Qty</th>
-                    <th className="py-2.5 px-3 text-right">Unit Price</th>
-                    <th className="py-2.5 px-3 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {invoice.lineItems.map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-3 px-3 font-semibold text-slate-900">{item.desc}</td>
-                      <td className="py-3 px-3 text-center text-slate-600 font-bold">{item.qty}</td>
-                      <td className="py-3 px-3 text-right text-slate-600">{formatCurrency(item.rate, invoice.currency)}</td>
-                      <td className="py-3 px-3 text-right font-bold text-slate-900">{formatCurrency(item.total, invoice.currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-6 border-t border-slate-100 pt-4 flex flex-col items-end">
-              <div className="w-full max-w-xs space-y-2 text-xs">
-                <div className="flex justify-between text-slate-500">
-                  <span>Subtotal</span>
-                  <span className="font-bold text-slate-800">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+      {/* 3. ALREADY PAID BANNER */}
+      {status === 'ALREADY_PAID' && (
+        <div className="rounded-2xl border border-purple-200 bg-purple-50/90 p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-200 pb-3">
+            <div className="flex items-center gap-3 text-purple-950">
+              <XCircle className="h-6 w-6 text-purple-600 shrink-0" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-purple-950">
+                    ALREADY PAID — CLOSED
+                  </h3>
+                  <span className="rounded-md bg-purple-200 text-purple-900 px-2 py-0.5 text-[10px] font-black uppercase">
+                    Read-Only
+                  </span>
                 </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>Tax / GST</span>
-                  <span className="font-bold text-slate-800">{formatCurrency(invoice.gstAmount, invoice.currency)}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-200 pt-2 text-sm">
-                  <span className="font-black text-slate-900">Grand Total</span>
-                  <span className="font-black text-blue-600">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
-                </div>
+                <p className="text-xs text-purple-800 font-medium mt-0.5">
+                  Payment already exists for this invoice. Financial duplicate closed.
+                </p>
               </div>
             </div>
+
+            {invoice.relatedInvoiceId && (
+              <Link
+                to={`/app/invoice/${invoice.relatedInvoiceId._id || invoice.relatedInvoiceId}`}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition shrink-0"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>View Related Invoice</span>
+              </Link>
+            )}
           </div>
 
-          {/* Original Document Preview Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-900">Original Document Preview</h2>
-              </div>
-              <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5" /> High Res Document Loaded
+          <div className="rounded-xl bg-white/80 p-3.5 border border-purple-200 text-xs space-y-1">
+            <span className="text-[10px] font-extrabold uppercase text-purple-700 block">Related Settlement Reference:</span>
+            <p className="font-extrabold text-slate-900">
+              Related Paid Invoice:{' '}
+              <span className="text-purple-900 font-mono font-black">
+                {invoice.relatedInvoiceId?.invoiceNumber || 'INV-1054'}
               </span>
-            </div>
-
-            <DocumentViewer invoice={invoice} />
+              {invoice.relatedInvoiceId?.vendorName && (
+                <span className="font-semibold text-slate-700"> — {invoice.relatedInvoiceId.vendorName}</span>
+              )}
+            </p>
           </div>
         </div>
+      )}
 
-        {/* Right Column: AI Insights, Manager Comments, Audit Trail */}
-        <div className="space-y-6">
-
-          {/* AI Insights Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-900">AI Extraction Insights</h2>
-              </div>
-              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                {invoice.confidence}% Score
-              </span>
+      {/* MANAGER RESUBMITTED REVISION BANNER */}
+      {isResubmitted && status === 'Pending' && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/80 p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-blue-200/80 pb-2.5">
+            <div className="flex items-center gap-2 text-blue-900 font-extrabold text-sm">
+              <RefreshCw className="h-4.5 w-4.5 text-blue-600" />
+              <span>RESUBMITTED FOR APPROVAL — REVISION {invoice.revisionNumber}</span>
             </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Vendor GSTIN</span>
-                <span className="font-mono font-bold text-slate-800">{invoice.vendorGstin || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Invoice Date</span>
-                <span className="font-semibold text-slate-800">{invoice.invoiceDate}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Payment Due Date</span>
-                <span className="font-bold text-amber-700">{invoice.dueDate && invoice.dueDate !== 'null' ? invoice.dueDate : '-'}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-400">Submitted By</span>
-                <span className="font-semibold text-slate-800">{invoice.submittedBy}</span>
-              </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Duplicate Check</span>
-                <span className="font-bold text-emerald-600">{invoice.duplicateCheck}</span>
-              </div>
-            </div>
+            <span className="font-mono text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-md">
+              Revision #{invoice.revisionNumber}
+            </span>
           </div>
 
-          {/* MANAGER COMMENTS BOX (Rendered ONLY for Manager) */}
-          {isManager && status === 'Pending' && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5 shadow-sm space-y-2">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-blue-600" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">Add Manager Approval Comment</h2>
+          {invoice.previousRevisionData && (
+            <div className="space-y-2 text-xs">
+              <div className="rounded-xl bg-white p-3 border border-blue-100 space-y-1">
+                <p className="font-bold text-slate-800">Previously Rejected Reason:</p>
+                <p className="text-slate-600 italic text-[11px]">"{invoice.previousRevisionData.rejectionReason || 'Incorrect Total'}"</p>
               </div>
-              <textarea
-                value={managerComment}
-                onChange={(e) => setManagerComment(e.target.value)}
-                placeholder="Enter authorization notes or rejection comments..."
-                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500"
-                rows={3}
-              />
+
+              {/* Changed Fields Diff List */}
+              {invoice.approvalHistory && invoice.approvalHistory.find((h) => h.action === 'RESUBMITTED')?.changes?.length > 0 && (
+                <div className="rounded-xl bg-white p-3 border border-blue-100 space-y-1.5">
+                  <p className="font-bold text-blue-900">Finance Corrections / Modified Fields:</p>
+                  <ul className="space-y-1 text-[11px]">
+                    {invoice.approvalHistory.find((h) => h.action === 'RESUBMITTED')?.changes.map((c, idx) => (
+                      <li key={idx} className="flex items-center gap-2 font-medium">
+                        <span className="font-bold text-slate-700 min-w-[100px]">{c.field}:</span>
+                        <span className="line-through text-slate-400">{String(c.oldValue)}</span>
+                        <span>→</span>
+                        <strong className="text-emerald-700 font-mono font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          {String(c.newValue)}
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Grid: Left = Bill & Audit Trail | Right = Document Preview */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* LEFT SIDE (7 COLS): Full Bill Fields, Line Items, & Audit Trail */}
+        <div className="lg:col-span-7 space-y-6">
+          
+          {/* 1. INLINE EDITING FORM OR BILL & VENDOR INFORMATION CARD */}
+          {isEditing ? (
+            <div className="rounded-2xl border-2 border-blue-500 bg-white p-6 shadow-xl space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2 text-blue-600">
+                  <Edit3 className="h-5 w-5" />
+                  <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">Correction & Resubmission Form</h2>
+                </div>
+                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-800 font-mono">
+                  Editing Revision #{invoice.revisionNumber + 1}
+                </span>
+              </div>
+
+              {resubmitError && (
+                <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-bold text-rose-700 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{resubmitError}</span>
+                </div>
+              )}
+
+              {/* Editable Fields Grid */}
+              <div className="grid gap-4 sm:grid-cols-2 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">
+                    Vendor Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formVendorName}
+                    onChange={(e) => setFormVendorName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">Vendor GSTIN</label>
+                  <input
+                    type="text"
+                    value={formVendorGstin}
+                    onChange={(e) => setFormVendorGstin(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">
+                    Invoice Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formInvoiceNumber}
+                    onChange={(e) => setFormInvoiceNumber(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono font-bold text-blue-600 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">P.O. Number</label>
+                  <input
+                    type="text"
+                    value={formPoNumber}
+                    onChange={(e) => setFormPoNumber(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-mono text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">
+                    Invoice Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formInvoiceDate}
+                    onChange={(e) => setFormInvoiceDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={formDueDate}
+                    onChange={(e) => setFormDueDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Line Items Correction Editor */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase text-slate-900">Line Items Breakdown</h3>
+                  <button
+                    type="button"
+                    onClick={addLineItem}
+                    className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Item</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {formLineItems.map((item, idx) => (
+                    <div key={idx} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                      <div className="flex-1 min-w-[140px]">
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => updateLineItem(idx, 'description', e.target.value)}
+                          placeholder="Description"
+                          className="w-full rounded-lg border border-slate-200 bg-white p-1.5 font-medium text-slate-900"
+                        />
+                      </div>
+                      <div className="w-16">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateLineItem(idx, 'quantity', Number(e.target.value))}
+                          placeholder="QTY"
+                          className="w-full rounded-lg border border-slate-200 bg-white p-1.5 font-bold text-center text-slate-900"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <input
+                          type="number"
+                          value={item.unitPrice}
+                          onChange={(e) => updateLineItem(idx, 'unitPrice', Number(e.target.value))}
+                          placeholder="Unit Price"
+                          className="w-full rounded-lg border border-slate-200 bg-white p-1.5 font-semibold text-right text-slate-900"
+                        />
+                      </div>
+                      <div className="w-24 font-bold text-right text-slate-900 pt-1">
+                        ₹{item.total.toLocaleString()}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(idx)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total Calculation Form Box */}
+              <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between font-bold text-slate-700">
+                  <span>Subtotal Amount:</span>
+                  <span className="font-mono text-sm">₹{formSubtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between font-bold text-slate-700">
+                  <span>Calculated GST Tax:</span>
+                  <span className="font-mono text-sm">₹{formGst.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-300 font-black text-sm">
+                  <span className="text-slate-900">Grand Total Amount:</span>
+                  <span className="text-blue-600 font-mono text-base">₹{formGrandTotal.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  disabled={resubmitLoading}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResubmitInvoice}
+                  disabled={resubmitLoading}
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 cursor-pointer disabled:opacity-50"
+                >
+                  {resubmitLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  <span>Resubmit for Approval</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4.5 w-4.5 text-blue-600" />
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Bill & Party Details</h2>
+                </div>
+                <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-700">
+                  {invoice.category}
+                </span>
+              </div>
+
+              {/* Vendor vs Buyer Split */}
+              <div className="grid gap-4 sm:grid-cols-2 rounded-xl bg-slate-50 p-4 border border-slate-100 text-xs">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-400">Vendor / Issuer</span>
+                  <p className="font-black text-slate-900 text-sm">{invoice.vendorName}</p>
+                  <p className="text-[11px] font-mono text-slate-600">GSTIN: {invoice.vendorGstin}</p>
+                </div>
+
+                <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-400">Billed To / Buyer</span>
+                  <p className="font-bold text-slate-900 text-sm">{invoice.buyerName}</p>
+                  <p className="text-[11px] font-mono text-slate-600">GSTIN: {invoice.buyerGstin}</p>
+                </div>
+              </div>
+
+              {/* 4-Grid Important Fields */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Invoice Number</span>
+                  <p className="font-mono font-bold text-blue-600 truncate">#{invoice.invoiceNumber}</p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">P.O. Number</span>
+                  <p className="font-mono font-bold text-slate-800 truncate">{invoice.poNumber}</p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Invoice Date</span>
+                  <p className="font-semibold text-slate-900">{invoice.invoiceDate}</p>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Payment Due</span>
+                  <p className="font-bold text-amber-700">{invoice.dueDate && invoice.dueDate !== 'null' ? invoice.dueDate : '-'}</p>
+                </div>
+              </div>
+
+              {/* AI Insight & Confidence Bar */}
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50/80 border border-emerald-200 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-emerald-600 fill-emerald-600" />
+                  <span className="font-bold text-emerald-900">
+                    AI Extraction Score: <strong>{invoice.confidenceScore}%</strong> ({invoice.extractionSource})
+                  </span>
+                </div>
+                {invoice.duplicate ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md">
+                    <AlertTriangle className="h-3 w-3" /> Duplicate Risk Flagged
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    <ShieldCheck className="h-3 w-3" /> Clean Verification
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Audit Trail Timeline Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
-              <h2 className="text-sm font-bold text-slate-900">Audit & Approval Trail</h2>
+          {/* 2. ITEMIZED LINE BREAKDOWN TABLE */}
+          {!isEditing && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Itemized Line Items</h2>
+                <span className="text-xs font-bold text-slate-500">{invoice.lineItems.length} Items</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
+                      <th className="py-2.5 px-3">Item Description</th>
+                      <th className="py-2.5 px-3 text-center">QTY</th>
+                      <th className="py-2.5 px-3 text-right">Unit Price</th>
+                      <th className="py-2.5 px-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                    {invoice.lineItems.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50">
+                        <td className="py-3 px-3 font-semibold text-slate-900">{item.description}</td>
+                        <td className="py-3 px-3 text-center font-bold text-slate-700">{item.quantity}</td>
+                        <td className="py-3 px-3 text-right text-slate-600">{formatCurrency(item.unitPrice, invoice.currency)}</td>
+                        <td className="py-3 px-3 text-right font-bold text-slate-900">{formatCurrency(item.total, invoice.currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Total Calculation Box */}
+              <div className="flex flex-col items-end pt-2">
+                <div className="w-full max-w-xs rounded-xl bg-slate-50 p-4 border border-slate-200 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-500 font-semibold">
+                    <span>Subtotal Amount:</span>
+                    <span className="text-slate-800">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500 font-semibold">
+                    <span>Calculated GST / Tax:</span>
+                    <span className="text-slate-800">{formatCurrency(invoice.gstAmount, invoice.currency)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-300 pt-2 text-sm font-black">
+                    <span className="text-slate-900">Grand Total Payable:</span>
+                    <span className="text-blue-600">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3. FULL AUDIT & APPROVAL LIFECYCLE TRAIL CARD */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4.5 w-4.5 text-blue-600" />
+                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Full Audit & Lifecycle History</h2>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase text-slate-400">Timestamped Record</span>
             </div>
 
-            <div className="relative pl-4 space-y-4 text-xs border-l-2 border-slate-200">
-              {auditLogs.map((log, index) => (
-                <div key={index} className="relative">
-                  <div className="absolute -left-[21px] top-0 h-2.5 w-2.5 rounded-full bg-blue-600 ring-4 ring-white"></div>
-                  <p className="font-bold text-slate-900">{log.event}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {log.time} • <span className="text-slate-600 font-semibold">{log.user}</span>
-                  </p>
-                </div>
-              ))}
+            <div className="relative pl-6 space-y-6 text-xs border-l-2 border-slate-200">
+              
+              {/* Render dynamic approval history entries if recorded */}
+              {Array.isArray(invoice.approvalHistory) && invoice.approvalHistory.length > 0 ? (
+                invoice.approvalHistory.map((h, idx) => (
+                  <div key={idx} className="relative">
+                    <div
+                      className={`absolute -left-[31px] top-0 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-xs ${
+                        h.action === 'PAYMENT_COMPLETED'
+                          ? 'bg-emerald-600 ring-4 ring-emerald-100'
+                          : h.action === 'APPROVED'
+                          ? 'bg-indigo-600'
+                          : h.action === 'REJECTED'
+                          ? 'bg-rose-600'
+                          : h.action === 'RESUBMITTED'
+                          ? 'bg-blue-600'
+                          : 'bg-indigo-600'
+                      }`}
+                    >
+                      {h.action === 'PAYMENT_COMPLETED' ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 stroke-[2.5]" />
+                      ) : h.action === 'APPROVED' ? (
+                        <UserCheck className="h-3.5 w-3.5" />
+                      ) : h.action === 'REJECTED' ? (
+                        <XCircle className="h-3.5 w-3.5" />
+                      ) : h.action === 'RESUBMITTED' ? (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5" />
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-slate-900">
+                          {idx + 1}. {h.action === 'PAYMENT_COMPLETED' ? 'PAYMENT COMPLETED & MARKED AS PAID' : h.action === 'APPROVED' ? 'APPROVED & MOVED TO PAYMENT QUEUE' : h.action} (Revision #{h.revisionNumber || 1})
+                        </p>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {h.timestamp ? new Date(h.timestamp).toLocaleString() : '-'}
+                        </span>
+                      </div>
+
+                      <p className="text-slate-600 font-medium">
+                        Performed by <strong className="text-slate-800">{h.performedByName || 'User'}</strong> ({h.performedByRole || 'Role'})
+                      </p>
+
+                      {h.reason && (
+                        <p className="text-rose-700 font-bold bg-rose-50 border border-rose-200 p-2 rounded-xl text-[11px]">
+                          Rejection Reason: "{h.reason}"
+                        </p>
+                      )}
+
+                      {h.comment && (
+                        <p className="text-slate-700 italic bg-slate-50 p-2 rounded-xl text-[11px]">
+                          Note: "{h.comment}"
+                        </p>
+                      )}
+
+                      {Array.isArray(h.changes) && h.changes.length > 0 && (
+                        <div className="bg-blue-50/70 border border-blue-100 p-2 rounded-xl text-[11px] space-y-0.5">
+                          <p className="font-bold text-blue-900">Fields Corrected:</p>
+                          {h.changes.map((c, cIdx) => (
+                            <p key={cIdx} className="text-slate-700">
+                              • <strong>{c.field}:</strong> <span className="line-through text-slate-400">{String(c.oldValue)}</span> → <strong className="text-emerald-700 font-mono">{String(c.newValue)}</strong>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                /* Fallback static timeline if history array is empty */
+                <>
+                  {/* STEP 1: Upload & Extraction */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs">
+                      <FileCheck className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-slate-900">1. Invoice Document Ingested</p>
+                        <span className="text-[10px] text-slate-400 font-mono">{invoice.createdAt}</span>
+                      </div>
+                      <p className="text-slate-600 font-medium">
+                        Processed by <strong className="text-slate-800">{invoice.submittedBy}</strong> using {invoice.extractionSource} strategy.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* STEP 2: Pass to Approval */}
+                  <div className="relative">
+                    <div className="absolute -left-[31px] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xs">
+                      <Send className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-slate-900">2. Submitted for Authorization</p>
+                        <span className="text-[10px] text-slate-400 font-mono">{invoice.createdAt}</span>
+                      </div>
+                      <p className="text-slate-600 font-medium">
+                        Passed to Manager Approval Queue by <strong className="text-slate-800">{invoice.submittedBy}</strong>.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* STEP 3: Current Status */}
+                  <div className="relative">
+                    <div
+                      className={`absolute -left-[31px] top-0 flex h-6 w-6 items-center justify-center rounded-full text-white shadow-xs ${
+                        status === 'Approved' || status === 'PAYMENT_QUEUE' || status === 'PAID' || status === 'Paid'
+                          ? 'bg-emerald-600'
+                          : status === 'NEEDS_CORRECTION'
+                          ? 'bg-amber-500'
+                          : status === 'DUPLICATE_SUBMISSION'
+                          ? 'bg-rose-600'
+                          : status === 'ALREADY_PAID'
+                          ? 'bg-purple-600'
+                          : 'bg-amber-500 animate-pulse'
+                      }`}
+                    >
+                      {status === 'Approved' || status === 'PAYMENT_QUEUE' || status === 'PAID' || status === 'Paid' ? (
+                        <UserCheck className="h-3.5 w-3.5" />
+                      ) : status === 'NEEDS_CORRECTION' ? (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      ) : status === 'DUPLICATE_SUBMISSION' || status === 'ALREADY_PAID' ? (
+                        <XCircle className="h-3.5 w-3.5" />
+                      ) : (
+                        <Clock className="h-3.5 w-3.5" />
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-slate-900">
+                          {status === 'Approved' || status === 'PAYMENT_QUEUE' || status === 'PAID' || status === 'Paid'
+                            ? '3. Manager Approved & Authorized'
+                            : status === 'NEEDS_CORRECTION'
+                            ? '3. Manager Requested Correction'
+                            : status === 'DUPLICATE_SUBMISSION'
+                            ? '3. Closed as Duplicate Submission'
+                            : status === 'ALREADY_PAID'
+                            ? '3. Closed as Already Paid'
+                            : '3. Awaiting Manager Approval'}
+                        </p>
+                        <span className="text-[10px] text-slate-400 font-mono">{invoice.updatedAt}</span>
+                      </div>
+
+                      {status === 'Approved' && (
+                        <p className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl">
+                          Authorized by <strong className="text-emerald-950">{invoice.approvedBy}</strong> for financial settlement.
+                        </p>
+                      )}
+
+                      {status === 'Rejected' && (
+                        <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 space-y-1">
+                          <p className="text-rose-800 font-bold">
+                            Rejected by <strong className="text-rose-950">{invoice.approvedBy || 'Manager'}</strong>
+                          </p>
+                          {invoice.rejectionReason && (
+                            <p className="text-rose-700 font-medium italic text-[11px]">
+                              Rejection Reason: "{invoice.rejectionReason}"
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {status === 'Pending' && (
+                        <p className="text-amber-700 font-semibold bg-amber-50 border border-amber-200 p-2 rounded-xl">
+                          Invoice is currently in the Manager Approval Queue awaiting authorization.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
             </div>
           </div>
         </div>
+
+        {/* RIGHT SIDE (5 COLS): Original Source Document & Manager Comment Box */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="sticky top-6 space-y-6">
+            
+            {/* MANAGER COMMENT BOX (IF MANAGER & PENDING) */}
+            {isManager && status === 'Pending' && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                  <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                    Manager Review Note / Rejection Reason
+                  </h3>
+                </div>
+                <textarea
+                  value={managerComment}
+                  onChange={(e) => setManagerComment(e.target.value)}
+                  placeholder="Type approval note or reason for rejection here..."
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition placeholder:text-slate-400 font-medium"
+                />
+              </div>
+            )}
+
+            {/* DOCUMENT PREVIEW CARD */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">Source Document</h3>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400">PDF / Image Preview</span>
+              </div>
+
+              <DocumentViewer invoice={invoice} />
+            </div>
+
+          </div>
+        </div>
       </div>
+
+      {/* REJECTION MODAL FOR MANAGER */}
+      <RejectInvoiceModal
+        isOpen={isRejectModalOpen}
+        onClose={() => setIsRejectModalOpen(false)}
+        invoice={invoice}
+        onConfirm={handleConfirmReject}
+      />
     </div>
   )
 }

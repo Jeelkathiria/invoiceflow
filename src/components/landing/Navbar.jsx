@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { FileText, Github, ArrowRight } from 'lucide-react'
+import { Github, ArrowRight } from 'lucide-react'
+import { Logo } from '../common/Logo'
 
 const navItems = [
   { label: 'Features', href: '#features' },
@@ -14,18 +15,8 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 text-xl font-extrabold text-white group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-white font-black shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-            <FileText className="h-4.5 w-4.5 stroke-[2.5]" />
-          </div>
-          <div className="flex items-baseline">
-            <span className="font-signature text-2xl font-bold bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent transform -rotate-3 hover:rotate-0 transition-transform">
-              Invoice
-            </span>
-            <span className="font-black tracking-wider text-white text-base ml-0.5 uppercase">
-              FLOW
-            </span>
-          </div>
+        <Link to="/" className="group">
+          <Logo className="h-9 w-9" showText={true} />
         </Link>
 
         {/* Nav Links */}
@@ -34,6 +25,11 @@ export function Navbar() {
             <a
               key={item.label}
               href={item.href}
+              onClick={(e) => {
+                if (item.href === '#architecture') {
+                  window.dispatchEvent(new Event('open-architecture'))
+                }
+              }}
               className="text-xs font-bold text-slate-300 transition hover:text-white"
             >
               {item.label}

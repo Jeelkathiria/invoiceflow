@@ -18,7 +18,7 @@ export function PendingQueue({ liveInvoices = [] }) {
           invoice: inv.invoiceNumber || 'INV-001',
           vendor: inv.vendorName || 'Unknown Vendor',
           amount: formatCurrency(inv.amount || inv.totalAmount || 0, inv.currency),
-          submittedBy: inv.uploadedBy?.name || 'Finance Executive',
+          submittedBy: 'Finance Executive',
           priority: (inv.amount || 0) > 100000 ? 'High' : (inv.amount || 0) > 40000 ? 'Medium' : 'Low',
         }))
     : []

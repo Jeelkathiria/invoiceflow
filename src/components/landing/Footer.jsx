@@ -1,4 +1,5 @@
-import { Github, FileText, ExternalLink, ShieldCheck, Sparkles, Server } from 'lucide-react'
+import { Github, ExternalLink, ShieldCheck, Sparkles, Server } from 'lucide-react'
+import { Logo } from '../common/Logo'
 
 export function Footer() {
   return (
@@ -7,19 +8,7 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-5">
           {/* Main Brand Column */}
           <div className="space-y-4 lg:col-span-2">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-indigo-500 to-violet-600 text-white font-black shadow-md">
-                <FileText className="h-5 w-5 stroke-[2.5]" />
-              </div>
-              <div className="flex items-baseline">
-                <span className="font-signature text-3xl font-bold bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent transform -rotate-3">
-                  Invoice
-                </span>
-                <span className="font-black tracking-wider text-white text-lg ml-0.5 uppercase">
-                  FLOW
-                </span>
-              </div>
-            </div>
+            <Logo className="h-10 w-10" showText={true} />
             <p className="text-xs font-semibold text-indigo-300">
               AI-Powered Multimodal Invoice Lifecycle Platform
             </p>

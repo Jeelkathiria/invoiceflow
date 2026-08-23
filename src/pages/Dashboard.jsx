@@ -1,238 +1,104 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
 import api from '../services/axios'
-import { Sparkles, Plus, AlertCircle, ArrowRight, Zap, FileText, CheckCircle2, RefreshCw, XCircle, Clock } from 'lucide-react'
-import { CardSummary } from '../components/dashboard/CardSummary'
-import { RecentUploads } from '../components/dashboard/RecentUploads'
-import { PendingQueue } from '../components/dashboard/PendingQueue'
-import { UpcomingPayments } from '../components/dashboard/UpcomingPayments'
-import { ActivityTimeline } from '../components/dashboard/ActivityTimeline'
-import { ExpenseAnalytics } from '../components/dashboard/ExpenseAnalytics'
 import { useAuth } from '../context/AuthContext'
-
-import { calculateMultiCurrencyTotals } from '../utils/formatCurrency'
+import { FinanceDashboardView } from '../components/dashboard/FinanceDashboardView'
+import { ManagerDashboardView } from '../components/dashboard/ManagerDashboardView'
+import { toast } from 'react-hot-toast'
 
 export function Dashboard() {
   const { user } = useAuth()
-  const navigate = useNavigate()
 
   const userRole = (user?.role || 'finance').toLowerCase()
   const isManager = userRole.includes('manager')
-  const isFinance = userRole.includes('finance') || !isManager
 
+  // Dashboard Data State
+  const [stats, setStats] = useState({})
   const [invoices, setInvoices] = useState([])
+  const [activityTimeline, setActivityTimeline] = useState([])
+  const [teamOverview, setTeamOverview] = useState([])
+  const [attentionInvoices, setAttentionInvoices] = useState([])
+  const [riskOverview, setRiskOverview] = useState({})
   const [loading, setLoading] = useState(true)
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get('/invoices')
-      if (res.data && res.data.data && Array.isArray(res.data.data.invoices)) {
-        setInvoices(res.data.data.invoices)
+      // 1. Fetch stats & invoices (Backend automatically isolates data for Finance vs Manager)
+      const [statsRes, invoicesRes, activityRes] = await Promise.all([
+        api.get('/dashboard/stats').catch(() => ({ data: { data: {} } })),
+        api.get('/invoices').catch(() => ({ data: { data: { invoices: [] } } })),
+        api.get('/dashboard/activity').catch(() => ({ data: { data: [] } })),
+      ])
+
+      setStats(statsRes.data?.data || {})
+
+      if (invoicesRes.data && invoicesRes.data.data && Array.isArray(invoicesRes.data.data.invoices)) {
+        setInvoices(invoicesRes.data.data.invoices)
       } else {
         setInvoices([])
       }
+
+      setActivityTimeline(Array.isArray(activityRes.data?.data) ? activityRes.data.data : [])
+
+      // 2. Fetch manager specific data if logged in as Manager
+      if (isManager) {
+        const [teamRes, attentionRes, riskRes] = await Promise.all([
+          api.get('/dashboard/team').catch(() => ({ data: { data: [] } })),
+          api.get('/dashboard/attention').catch(() => ({ data: { data: [] } })),
+          api.get('/dashboard/risk-overview').catch(() => ({ data: { data: {} } })),
+        ])
+
+        setTeamOverview(Array.isArray(teamRes.data?.data) ? teamRes.data.data : [])
+        setAttentionInvoices(Array.isArray(attentionRes.data?.data) ? attentionRes.data.data : [])
+        setRiskOverview(riskRes.data?.data || {})
+      }
     } catch (err) {
-      console.warn('[Dashboard] Could not fetch live invoices:', err)
-      setInvoices([])
+      console.warn('[Dashboard] Could not fetch live dashboard datasets:', err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [isManager])
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [fetchDashboardData])
 
-  // Filter out Draft invoices (only include invoices submitted / sent for approval by Finance)
-  const submittedInvoices = useMemo(() => {
-    return invoices.filter((i) => i.status && i.status.toLowerCase() !== 'draft')
-  }, [invoices])
-
-  // Dynamic KPI metrics calculated cleanly from submitted live MongoDB data (0 if empty)
-  const dynamicKpis = useMemo(() => {
-    const totalCount = submittedInvoices.length
-    const pendingInvoices = submittedInvoices.filter((i) => i.status === 'Pending' && !i.duplicate)
-    const pendingCount = pendingInvoices.length
-
-    const approvedInvoices = submittedInvoices.filter((i) => i.status === 'Approved')
-    const approvedCount = approvedInvoices.length
-
-    const rejectedInvoices = submittedInvoices.filter((i) => i.status === 'Rejected')
-    const rejectedCount = rejectedInvoices.length
-
-    // Multi-currency calculation
-    const approvedTotals = calculateMultiCurrencyTotals(approvedInvoices)
-    const allTotals = calculateMultiCurrencyTotals(submittedInvoices)
-
-    if (isManager) {
-      // MANAGER DASHBOARD SPECIFIC METRICS:
-      return [
-        {
-          title: 'Pending Approvals',
-          value: pendingCount.toString(),
-          change: pendingCount > 0 ? 'Requires review & action' : 'No items awaiting review',
-          trend: 'up',
-          icon: Clock,
-          color: 'amber',
-          description: 'Awaiting Manager Signoff',
-        },
-        {
-          title: 'Approved Today',
-          value: approvedCount.toString(),
-          change: approvedCount > 0 ? 'Cleared for settlement' : 'No approved items today',
-          trend: 'up',
-          icon: CheckCircle2,
-          color: 'green',
-          description: 'Cleared for Settlement',
-        },
-        {
-          title: 'Rejected Today',
-          value: rejectedCount.toString(),
-          change: rejectedCount > 0 ? 'Audit anomalies caught' : 'No rejected items',
-          trend: 'down',
-          icon: XCircle,
-          color: 'rose',
-          description: 'Pricing / Data Discrepancies',
-        },
-        {
-          title: 'Total Approval Amount',
-          value: approvedTotals.formattedInr,
-          subValue: approvedTotals.hasMultipleCurrencies ? approvedTotals.formattedUsd : (approvedTotals.usdTotal > 0 ? approvedTotals.formattedUsd : null),
-          change: approvedTotals.equivalentInr > 0 ? `Total: ${approvedTotals.formattedDual}` : '₹0 cleared amount',
-          trend: 'up',
-          icon: Sparkles,
-          color: 'blue',
-          description: approvedTotals.hasMultipleCurrencies ? `Equiv: ${approvedTotals.formattedUsd}` : 'Cumulative Cleared Value',
-        },
-      ]
-    } else {
-      // FINANCE DASHBOARD SPECIFIC METRICS:
-      return [
-        {
-          title: 'Total Invoices',
-          value: totalCount.toString(),
-          change: totalCount > 0 ? `${totalCount} ingested invoices` : '0 uploaded invoices',
-          trend: 'up',
-          icon: FileText,
-          color: 'blue',
-          description: 'Ingested & Parsed',
-        },
-        {
-          title: 'Pending Approval',
-          value: pendingCount.toString(),
-          change: pendingCount > 0 ? 'Sent to Manager queue' : '0 pending approval',
-          trend: 'up',
-          icon: AlertCircle,
-          color: 'amber',
-          description: 'Awaiting Manager Review',
-        },
-        {
-          title: 'Approved',
-          value: approvedCount.toString(),
-          change: approvedCount > 0 ? 'Settlements cleared' : '0 approved',
-          trend: 'up',
-          icon: CheckCircle2,
-          color: 'green',
-          description: 'Payment Authorized',
-        },
-        {
-          title: 'Total Invoice Amount',
-          value: allTotals.formattedInr,
-          subValue: allTotals.hasMultipleCurrencies ? allTotals.formattedUsd : (allTotals.usdTotal > 0 ? allTotals.formattedUsd : null),
-          change: allTotals.equivalentInr > 0 ? `Total: ${allTotals.formattedDual}` : '₹0 invoice value',
-          trend: 'up',
-          icon: Sparkles,
-          color: 'blue',
-          description: allTotals.hasMultipleCurrencies ? `Equiv: ${allTotals.formattedUsd}` : 'Total Financial Value',
-        },
-      ]
+  // Handle Finance "Mark as Paid" action
+  const handleMarkAsPaid = async (invoiceId) => {
+    try {
+      const res = await api.put(`/invoices/${invoiceId}/pay`)
+      toast.success('Invoice marked as PAID by Finance!')
+      fetchDashboardData()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not mark invoice as paid')
     }
-  }, [submittedInvoices, isManager])
+  }
+
+  if (isManager) {
+    return (
+      <ManagerDashboardView
+        user={user}
+        stats={stats}
+        invoices={invoices}
+        teamOverview={teamOverview}
+        attentionInvoices={attentionInvoices}
+        riskOverview={riskOverview}
+        activityTimeline={activityTimeline}
+        onRefresh={fetchDashboardData}
+        loading={loading}
+      />
+    )
+  }
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-blue-700">
-              {isManager ? 'Manager Portal' : 'Finance Executive'}
-            </span>
-            <span className="text-xs text-slate-400 font-medium">• Live MongoDB Sync</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-black text-slate-900 tracking-tight">
-            Welcome back, {user?.name || 'User'}!
-          </h1>
-          <p className="mt-0.5 text-xs text-slate-500 font-medium">
-            {isManager
-              ? 'Review pending approvals, audit AI extractions, and authorize invoice payments.'
-              : 'Upload invoices, review AI extracted data, and submit for manager approval.'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={fetchDashboardData}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
-
-          {isFinance && (
-            <button
-              onClick={() => navigate('/app/upload')}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
-            >
-              <Plus className="h-4 w-4 stroke-[3]" />
-              <span>Upload Invoice</span>
-            </button>
-          )}
-
-          {isManager && (
-            <button
-              onClick={() => navigate('/app/approval-queue')}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
-            >
-              <span>Review Approval Queue</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Dynamic KPI Metric Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {dynamicKpis.map((kpi, idx) => (
-          <CardSummary key={idx} {...kpi} />
-        ))}
-      </div>
-
-      {/* Main Grid View */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left 2 Columns */}
-        <div className="lg:col-span-2 space-y-6">
-          <ExpenseAnalytics liveInvoices={submittedInvoices} />
-          {isManager ? (
-            <PendingQueue liveInvoices={submittedInvoices} />
-          ) : (
-            <RecentUploads liveInvoices={submittedInvoices} />
-          )}
-        </div>
-
-        {/* Right 1 Column */}
-        <div className="space-y-6">
-          {isManager ? (
-            <RecentUploads liveInvoices={submittedInvoices} />
-          ) : (
-            <PendingQueue liveInvoices={submittedInvoices} />
-          )}
-          <UpcomingPayments liveInvoices={submittedInvoices} />
-          <ActivityTimeline liveInvoices={submittedInvoices} />
-        </div>
-      </div>
-    </div>
+    <FinanceDashboardView
+      user={user}
+      stats={stats}
+      invoices={invoices}
+      activityTimeline={activityTimeline}
+      onMarkAsPaid={handleMarkAsPaid}
+      onRefresh={fetchDashboardData}
+      loading={loading}
+    />
   )
 }

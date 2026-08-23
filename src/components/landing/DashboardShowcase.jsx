@@ -3,16 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
   UserCheck,
+  Users,
+  CreditCard,
   Upload,
   Clock,
   FileText,
   ShieldCheck,
-  IndianRupee,
-  DollarSign,
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
   Sparkles,
+  CheckCheck,
+  RefreshCw,
 } from 'lucide-react'
 
 const showcaseTabs = [
@@ -20,20 +22,20 @@ const showcaseTabs = [
     id: 'finance-dashboard',
     label: 'Finance Dashboard',
     icon: LayoutDashboard,
-    badge: 'Finance Exec View',
-    title: 'Real-Time Financial Analytics & Spend Overview',
-    description: 'Track total processed volumes, approval queues, duplicate risk alerts, and dual-currency spend distributions with Shadcn Recharts vector graphs.',
+    badge: 'Finance Executive View',
+    title: 'Personal Isolated Ledger & Real-Time Spend Overview',
+    description: 'Finance Executives manage their personal invoice submissions with OCR + Gemini 2.5 Vision dual extraction, duplicate risk detection, and multi-currency spend tracking.',
     mockup: {
       metrics: [
-        { label: 'Total Invoices Processed', val: '1,420', sub: '₹2.48 Crore ($297k eqv)' },
-        { label: 'Awaiting Manager Signoff', val: '14', sub: '₹18.40 Lakh ($22.0k eqv)' },
-        { label: 'Duplicate Prevention Rate', val: '99.8%', sub: '42 High-Risk Flagged' },
+        { label: 'My Total Processed', val: '42 Invoices', sub: '₹48.60 Lakh ($58.2k eqv)' },
+        { label: 'Pending Manager Signoff', val: '3 Invoices', sub: 'Awaiting Authorization' },
+        { label: 'Payment Queue Stage', val: '12 Invoices', sub: 'Approved & Staged' },
       ],
-      previewTitle: 'Executive Spend Summary',
+      previewTitle: 'Personal Executive Submissions',
       items: [
-        { inv: 'INV-2026-0089', vendor: 'Spectrum Tech Supplies', amount: '₹1,58,200', usd: '$1,894', status: 'Approved' },
-        { inv: 'INV-2026-0090', vendor: 'CloudScale Systems', amount: '₹4,25,000', usd: '$5,089', status: 'Pending Review' },
-        { inv: 'INV-2026-0091', vendor: 'Apex Office Solutions', amount: '₹84,500', usd: '$1,012', status: 'Approved' },
+        { inv: 'INV-2026-0089', vendor: 'Spectrum Tech Supplies', amount: '₹1,58,200', usd: '$1,894', status: 'Payment Queue' },
+        { inv: 'INV-2026-0090', vendor: 'CloudScale Systems', amount: '₹4,25,000', usd: '$5,089', status: 'Pending Approval' },
+        { inv: 'INV-2026-0091', vendor: 'Apex Office Solutions', amount: '₹84,500', usd: '$1,012', status: 'Paid (Settled)' },
       ],
     },
   },
@@ -41,76 +43,82 @@ const showcaseTabs = [
     id: 'manager-dashboard',
     label: 'Manager Dashboard',
     icon: UserCheck,
-    badge: 'Manager Signoff View',
-    title: 'Streamlined Approval Operations & Reasoned Decisioning',
-    description: 'Empowers Department Managers to inspect raw invoice documents side-by-side with AI-extracted metadata, mandatory fields clearance, and 1-click signoffs.',
+    badge: 'Manager Control Center',
+    title: 'Organization-Wide Approval & Audit Control',
+    description: 'Managers oversee all finance executive submissions, inspect raw documents side-by-side with AI extraction metadata, monitor risk indicators, and execute signoffs.',
     mockup: {
       metrics: [
-        { label: 'Pending Manager Approval', val: '8 Tasks', sub: 'Action Required' },
-        { label: 'Avg Signoff Response', val: '1.4 Hours', sub: '92% Same Day' },
-        { label: 'Rejection Log Audit', val: '100%', sub: 'Mandatory Rationale Logged' },
+        { label: 'Pending Approvals', val: '8 Tasks', sub: 'Needs Manager Action' },
+        { label: 'Risk Indicators', val: '2 Duplicates', sub: 'High Value Flagged' },
+        { label: 'Org Payment Queue', val: '₹62.40 Lakh', sub: 'Finance Disbursing' },
       ],
-      previewTitle: 'Manager Signoff Queue',
+      previewTitle: 'Organization Approval Queue',
       items: [
-        { inv: 'INV-2026-0088', vendor: 'Logistics Core Corp', amount: '₹3,12,000', usd: '$3,736', status: 'Action Needed' },
+        { inv: 'INV-2026-0088', vendor: 'Logistics Core Corp', amount: '₹3,12,000', usd: '$3,736', status: 'Pending Approval' },
         { inv: 'INV-2026-0084', vendor: 'Vertex Cyber Security', amount: '₹6,40,000', usd: '$7,664', status: 'Approved' },
+        { inv: 'INV-2026-0082', vendor: 'Global Telecom Ltd', amount: '₹1,95,000', usd: '$2,335', status: 'Needs Correction' },
       ],
     },
   },
   {
-    id: 'upload-invoice',
-    label: 'Upload Invoice',
-    icon: Upload,
-    badge: 'Multimodal Ingestion',
-    title: 'Drag & Drop File Staging with Hybrid AI Extraction',
-    description: 'Supports PDF, PNG, and JPEG invoice uploads. Automatically runs client validation, Cloudinary CDN staging, Tesseract OCR, and Gemini 2.5 Vision fallback.',
+    id: 'finance-team',
+    label: 'Finance Team',
+    icon: Users,
+    badge: 'Manager-Only Module',
+    title: 'Executive Performance Analytics & Granular Member Drill-Down',
+    description: 'Dedicated manager view to search executives, review total invoice values, inspect status distribution donut charts, and monitor individual monthly spending trends.',
     mockup: {
       metrics: [
-        { label: 'Extraction Mode', val: 'Hybrid AI', sub: 'OCR + Gemini Vision' },
-        { label: 'Confidence Score', val: '98.6%', sub: '20 Tokens Cleared' },
-        { label: 'Missing Fields', val: '0 Mandatory', sub: 'Clean Staging Buffer' },
+        { label: 'Finance Executives', val: '6 Members', sub: 'Searchable Directory' },
+        { label: 'Top Performer', val: 'Rajesh Sharma', sub: '18 Invoices Processed' },
+        { label: 'Granular Analytics', val: '100% Isolated', sub: 'Individual Spend Logs' },
       ],
-      previewTitle: 'Live Extraction Staging Buffer',
+      previewTitle: 'Finance Executive Directory & Workload',
       items: [
-        { inv: 'INV-2026-0092', vendor: 'Global Cargo Logistics', amount: '₹2,10,000', usd: '$2,514', status: 'Extracted' },
+        { inv: 'Rajesh Sharma', vendor: 'rajesh@invoiceflow.io', amount: '₹18,50,000', usd: '18 Invoices', status: 'View Details →' },
+        { inv: 'Priya Patel', vendor: 'priya@invoiceflow.io', amount: '₹14,20,000', usd: '14 Invoices', status: 'View Details →' },
+        { inv: 'Amit Kumar', vendor: 'amit@invoiceflow.io', amount: '₹9,80,000', usd: '10 Invoices', status: 'View Details →' },
       ],
     },
   },
   {
-    id: 'approval-queue',
-    label: 'Approval Queue',
-    icon: Clock,
-    badge: 'Queue Isolation',
-    title: 'Role-Isolated Queue Management & Rejection Modals',
-    description: 'Filter invoices by status (Pending, Approved, Rejected). Managers open split-screen preview modals to approve or provide required rejection rationale.',
+    id: 'payment-queue',
+    label: 'Payment Queue',
+    icon: CreditCard,
+    badge: 'Disbursement Stage',
+    title: 'Post-Approval Payment Queue & 1-Click Settlement',
+    description: 'Approved invoices move automatically to the Payment Queue. Track due dates (Due Soon, Overdue), attach transaction reference numbers, and mark invoices as Paid.',
     mockup: {
       metrics: [
-        { label: 'Queue Status', val: 'Active', sub: 'Isolated RBAC Guards' },
-        { label: 'Currency View', val: 'INR / USD', sub: 'Live Rate Conversion' },
-        { label: 'Audit Trail', val: 'Encrypted', sub: 'Full MongoDB History' },
+        { label: 'Queue Balance', val: '₹28.90 Lakh', sub: 'Staged for Disbursement' },
+        { label: 'Overdue Alerts', val: '2 Invoices', sub: 'Action Recommended' },
+        { label: 'Settlement Proof', val: 'Mandatory Tx ID', sub: 'Complete Audit Trail' },
       ],
-      previewTitle: 'Approval Action Log',
+      previewTitle: 'Disbursement Queue Ledger',
       items: [
-        { inv: 'INV-2026-0085', vendor: 'DevOps Cloud Solutions', amount: '₹1,95,000', usd: '$2,335', status: 'Rejected (PO Missing)' },
+        { inv: 'INV-2026-0089', vendor: 'Spectrum Tech Supplies', amount: '₹1,58,200', usd: 'Due in 3 Days', status: 'Mark as Paid' },
+        { inv: 'INV-2026-0074', vendor: 'FastTrack Logistics', amount: '₹92,000', usd: 'OVERDUE (2 Days)', status: 'Mark as Paid' },
+        { inv: 'INV-2026-0062', vendor: 'Metro Energy Services', amount: '₹3,40,000', usd: 'Tx Ref #984210', status: 'Paid (Settled)' },
       ],
     },
   },
   {
-    id: 'invoice-details',
-    label: 'Invoice Details',
-    icon: FileText,
-    badge: 'Granular Inspection',
-    title: 'Split-Screen Document Viewer & Master Ledger Details',
-    description: 'Full inspection screen displaying high-resolution Cloudinary document viewer alongside header metadata, line item table, GST breakdown, and audit timeline.',
+    id: 'fix-resubmit',
+    label: 'Fix & Resubmit',
+    icon: RefreshCw,
+    badge: 'Rejection Workflow',
+    title: 'Structured Rejection Rationale & Version-Controlled Resubmission',
+    description: 'When a Manager rejects an invoice with a mandatory reason, Finance Executives receive real-time notifications, fix fields on split-screen UI, and resubmit with full diff logging.',
     mockup: {
       metrics: [
-        { label: 'Document CDN', val: 'Cloudinary', sub: 'High Res Preview' },
-        { label: 'Line Items', val: '6 Items', sub: 'Line Tax Parsed' },
-        { label: 'Audit Hash', val: '0x94f...21a', sub: 'Tamper Proof Record' },
+        { label: 'Rejection Reason', val: 'Mandatory', sub: 'Clear Manager Guidance' },
+        { label: 'Correction Mode', val: 'Split-Screen', sub: 'Original PDF Side-by-Side' },
+        { label: 'Audit Diff Log', val: 'Versioned', sub: 'Tracks Field Edits' },
       ],
-      previewTitle: 'Invoice Inspection View',
+      previewTitle: 'Correction & Resubmission Log',
       items: [
-        { inv: 'INV-2026-0089', vendor: 'Spectrum Tech Supplies', amount: '₹1,58,200', usd: '$1,894', status: 'Verified' },
+        { inv: 'INV-2026-0085', vendor: 'DevOps Cloud Solutions', amount: '₹1,95,000', usd: 'Reason: PO Missing', status: 'Needs Correction' },
+        { inv: 'INV-2026-0085-R1', vendor: 'DevOps Cloud Solutions (Fixed)', amount: '₹1,95,000', usd: 'PO-99421 Attached', status: 'Resubmitted' },
       ],
     },
   },
@@ -132,10 +140,10 @@ export function DashboardShowcase() {
           <Sparkles className="h-3.5 w-3.5" /> INTERACTIVE PLATFORM SHOWCASE
         </div>
         <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
-          Explore the InvoiceFlow Application
+          Explore the InvoiceFlow Platform
         </h2>
         <p className="text-sm text-slate-400 leading-relaxed max-w-2xl mx-auto font-medium">
-          Dedicated role-isolated workspaces for Finance Executives, Department Managers, and Audit Teams.
+          Dedicated role-isolated workspaces for Finance Executives, Managers, Payment Officers, and Team Leads.
         </p>
       </div>
 
@@ -234,16 +242,16 @@ export function DashboardShowcase() {
 
                   <div className="text-right">
                     <span className="font-bold text-white block">{item.amount}</span>
-                    <span className="text-[10px] text-blue-400 font-mono">{item.usd} eqv</span>
+                    <span className="text-[10px] text-blue-400 font-mono">{item.usd}</span>
                   </div>
 
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                      item.status.includes('Approved') || item.status.includes('Verified')
+                      item.status.includes('Approved') || item.status.includes('Paid') || item.status.includes('Details')
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : item.status.includes('Rejected')
+                        : item.status.includes('Correction') || item.status.includes('Rejected')
                         ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
                     }`}
                   >
                     {item.status}
@@ -257,3 +265,5 @@ export function DashboardShowcase() {
     </section>
   )
 }
+
+export default DashboardShowcase
