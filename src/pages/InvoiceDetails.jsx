@@ -110,15 +110,15 @@ export function InvoiceDetails() {
           id: resData.invoiceNumber || resData._id,
           invoiceNumber: resData.invoiceNumber || 'INV-001',
           poNumber: resData.poNumber || 'N/A',
-          vendorName: resData.vendorName || 'Design & Creative Agency',
-          vendorGstin: resData.vendorGstin || '27ABCDE1234F1Z5',
-          vendorAddress: resData.vendorAddress || 'ABC Seller, Location India',
-          vendorEmail: resData.vendorEmail || 'design@creative-agency-email.com',
-          buyerName: resData.buyerName || 'ABC Company',
-          buyerGstin: resData.buyerGstin || '27AAAAA0000A1Z5',
-          buyerAddress: resData.buyerAddress || 'XYZ Seller, Client Location, Street, City, India',
-          buyerEmail: resData.buyerEmail || 'client@client-email.com',
-          category: resData.category || 'General Operations',
+          vendorName: resData.vendorName || '-',
+          vendorGstin: resData.vendorGstin || '-',
+          vendorAddress: resData.vendorAddress || '-',
+          vendorEmail: resData.vendorEmail || '-',
+          buyerName: resData.buyerName || '-',
+          buyerGstin: resData.buyerGstin || '-',
+          buyerAddress: resData.buyerAddress || '-',
+          buyerEmail: resData.buyerEmail || '-',
+          category: resData.category || '-',
           invoiceDate: resData.invoiceDate ? (typeof resData.invoiceDate === 'string' && !resData.invoiceDate.includes('T') ? resData.invoiceDate : new Date(resData.invoiceDate).toLocaleDateString()) : '-',
           dueDate: resData.dueDate ? (typeof resData.dueDate === 'string' && !resData.dueDate.includes('T') ? resData.dueDate : new Date(resData.dueDate).toLocaleDateString()) : '-',
           rawInvoiceDate: rawDate,
@@ -1012,58 +1012,74 @@ export function InvoiceDetails() {
                 <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
                   <h3 className="text-blue-600 font-bold text-sm">Your details:</h3>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">FROM</span>
-                  <p className="font-black text-slate-900 text-sm">{invoice.vendorName}</p>
+                  <p className="font-black text-slate-900 text-sm">{invoice.vendorName && invoice.vendorName !== 'Unknown Vendor' ? invoice.vendorName : '-'}</p>
                   <div className="text-slate-500 font-medium space-y-0.5">
-                    <p>{invoice.vendorGstin && invoice.vendorGstin !== 'N/A' ? `GSTIN: ${invoice.vendorGstin}` : 'ABC Seller'}</p>
-                    <p>{invoice.vendorAddress || 'Design & Creative Agency'}</p>
+                    <p>{invoice.vendorGstin && invoice.vendorGstin !== 'N/A' && invoice.vendorGstin !== '-' ? `GSTIN: ${invoice.vendorGstin}` : '-'}</p>
+                    <p>{invoice.vendorAddress && invoice.vendorAddress !== '-' ? invoice.vendorAddress : '-'}</p>
                   </div>
-                  <p className="text-slate-400 font-medium pt-1">{invoice.vendorEmail || 'design@creative-agency-email.com'}</p>
+                  <p className="text-slate-400 font-medium pt-1">{invoice.vendorEmail && invoice.vendorEmail !== '-' ? invoice.vendorEmail : '-'}</p>
                 </div>
 
                 {/* CLIENT'S DETAILS: TO */}
                 <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
                   <h3 className="text-blue-600 font-bold text-sm">Client's details:</h3>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">TO</span>
-                  <p className="font-black text-slate-900 text-sm">{invoice.buyerName}</p>
+                  <p className="font-black text-slate-900 text-sm">{invoice.buyerName && invoice.buyerName !== 'Unknown Buyer' ? invoice.buyerName : '-'}</p>
                   <div className="text-slate-500 font-medium space-y-0.5">
-                    <p>{invoice.buyerGstin && invoice.buyerGstin !== 'N/A' ? `GSTIN: ${invoice.buyerGstin}` : 'XYZ Seller'}</p>
-                    <p>{invoice.buyerAddress || 'Client Location, Street, City, India'}</p>
+                    <p>{invoice.buyerGstin && invoice.buyerGstin !== 'N/A' && invoice.buyerGstin !== '-' ? `GSTIN: ${invoice.buyerGstin}` : '-'}</p>
+                    <p>{invoice.buyerAddress && invoice.buyerAddress !== '-' ? invoice.buyerAddress : '-'}</p>
                   </div>
-                  <p className="text-slate-400 font-medium pt-1">{invoice.buyerEmail || 'client@client-email.com'}</p>
+                  <p className="text-slate-400 font-medium pt-1">{invoice.buyerEmail && invoice.buyerEmail !== '-' ? invoice.buyerEmail : '-'}</p>
                 </div>
               </div>
 
               {/* INVOICE NO & DATES ROW */}
               <div className="flex flex-wrap items-center justify-between gap-4 pt-1 text-xs font-bold text-slate-700">
                 <div className="space-y-1">
-                  <p>Invoice No : <span className="font-mono font-black text-slate-900">{invoice.invoiceNumber}</span></p>
-                  <p>Invoice Date : <span className="text-slate-900 font-semibold">{invoice.invoiceDate}</span></p>
+                  <p>Invoice No : <span className="font-mono font-black text-slate-900">{invoice.invoiceNumber || '-'}</span></p>
+                  <p>Invoice Date : <span className="text-slate-900 font-semibold">{invoice.invoiceDate || '-'}</span></p>
                 </div>
                 <div className="text-right">
                   <p>Due Date : <span className="text-slate-900 font-semibold">{invoice.dueDate && invoice.dueDate !== 'null' ? invoice.dueDate : '-'}</span></p>
                 </div>
               </div>
 
-              {/* LINE ITEMS TABLE */}
+              {/* LINE ITEMS TABLE (Item, Qty, Price, Tax, Subtotal) */}
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-slate-700">
                       <th className="py-3 px-4">Item</th>
-                      <th className="py-3 px-4 text-center">HRS/QTY</th>
-                      <th className="py-3 px-4 text-right">Rate</th>
+                      <th className="py-3 px-4 text-center">Qty</th>
+                      <th className="py-3 px-4 text-right">Price</th>
+                      <th className="py-3 px-4 text-right">Tax</th>
                       <th className="py-3 px-4 text-right">Subtotal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                    {invoice.lineItems.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="py-3.5 px-4 font-bold text-slate-900">{item.description}</td>
-                        <td className="py-3.5 px-4 text-center font-bold text-slate-700">{item.quantity}</td>
-                        <td className="py-3.5 px-4 text-right text-slate-600">{formatCurrency(item.unitPrice, invoice.currency)}</td>
-                        <td className="py-3.5 px-4 text-right font-bold text-slate-900">{formatCurrency(item.total, invoice.currency)}</td>
+                    {Array.isArray(invoice.lineItems) && invoice.lineItems.length > 0 ? (
+                      invoice.lineItems.map((item, idx) => {
+                        const itemName = item.description && item.description !== 'Line Item' && item.description !== 'N/A' ? item.description : '-'
+                        const qtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '' && item.quantity !== 0) ? item.quantity : '-'
+                        const priceVal = (item.unitPrice || item.rate) ? formatCurrency(item.unitPrice || item.rate, invoice.currency) : '-'
+                        const taxVal = (item.taxAmount || item.tax) ? formatCurrency(item.taxAmount || item.tax, invoice.currency) : (item.taxRate ? `${item.taxRate}%` : '-')
+                        const totalVal = (item.total || item.amount) ? formatCurrency(item.total || item.amount, invoice.currency) : '-'
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-3.5 px-4 font-bold text-slate-900">{itemName}</td>
+                            <td className="py-3.5 px-4 text-center font-bold text-slate-700">{qtyVal}</td>
+                            <td className="py-3.5 px-4 text-right text-slate-600">{priceVal}</td>
+                            <td className="py-3.5 px-4 text-right text-slate-600">{taxVal}</td>
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-900">{totalVal}</td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-3.5 px-4 text-center text-slate-400 font-medium">No line items extracted</td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1079,19 +1095,19 @@ export function InvoiceDetails() {
                     {/* Tax field before SubTotal field */}
                     <div className="flex justify-between items-center">
                       <span>Tax</span>
-                      <span className="text-slate-900 font-bold">{formatCurrency(invoice.gstAmount, invoice.currency)}</span>
+                      <span className="text-slate-900 font-bold">{invoice.gstAmount > 0 ? formatCurrency(invoice.gstAmount, invoice.currency) : '-'}</span>
                     </div>
 
                     {/* Subtotal field */}
                     <div className="flex justify-between items-center">
                       <span>Subtotal</span>
-                      <span className="text-slate-900 font-bold">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
+                      <span className="text-slate-900 font-bold">{invoice.subtotal > 0 ? formatCurrency(invoice.subtotal, invoice.currency) : '-'}</span>
                     </div>
 
                     {/* Total field */}
                     <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
                       <span>Total</span>
-                      <span className="text-slate-900 font-mono font-black">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
+                      <span className="text-slate-900 font-mono font-black">{invoice.totalAmount > 0 ? formatCurrency(invoice.totalAmount, invoice.currency) : '-'}</span>
                     </div>
                   </div>
                 </div>
