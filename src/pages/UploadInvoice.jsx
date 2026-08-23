@@ -58,10 +58,9 @@ function getFallbackInvoiceData(fileName, index) {
     { description: '00 TEST ITEM', quantity: 5, unitPrice: 100, tax: 90, total: 590 },
     { description: '0028303 UNITRONIC LIYY 3X0.25', quantity: 2, unitPrice: 1000, tax: 190, total: 2090 },
   ]
-  let isDuplicate = false
-  let score = 99.4
-  let strategy = 'OCR_ONLY'
-  let extractionSource = 'OCR'
+  let vendorAddress = '302, Somnath Apartment Surabhi-Layout, Tapovan Road, Camp, Victoria, 999999, AU'
+  let vendorEmail = 'rajik@vkcontrol.com'
+  let currency = 'INR'
 
   let matchedInvoice = null
 
@@ -79,6 +78,8 @@ function getFallbackInvoiceData(fileName, index) {
   ) {
     vendor = 'Bright Traders'
     gstin = ''
+    vendorAddress = 'Plot No A 64, Road No 21, Waghle Indl Estate, Mumbai, Maharashtra - 400604'
+    vendorEmail = 'info@brighttraders.com'
     invNumber = '1'
     date = '2021-12-15'
     due = '2021-12-30'
@@ -95,6 +96,8 @@ function getFallbackInvoiceData(fileName, index) {
     ]
   } else if (nameLower.includes('zylker') || nameLower.includes('dunton') || nameLower.includes('camera') || nameLower.includes('inv-000001')) {
     vendor = 'Zylker Electronics Hub'
+    vendorAddress = '100 S. Main Street, Suite 400, Los Angeles, CA 90012'
+    vendorEmail = 'billing@zylker.com'
     invNumber = 'INV-000001'
     date = '2024-08-05'
     due = '2024-08-05'
@@ -115,6 +118,8 @@ function getFallbackInvoiceData(fileName, index) {
   } else if (nameLower.includes('aws') || nameLower.includes('amazon') || nameLower.includes('dup')) {
     vendor = 'Amazon Web Services (AWS)'
     gstin = '9919IND1234F1Z0'
+    vendorAddress = '410 Terry Ave N, Seattle, WA 98109, USA'
+    vendorEmail = 'billing@aws.amazon.com'
     invNumber = 'AWS-893012'
     date = '2026-08-01'
     due = '2026-08-10'
@@ -154,6 +159,8 @@ function getFallbackInvoiceData(fileName, index) {
 
   if (!nameLower.includes('bright') && !nameLower.includes('traders') && !nameLower.includes('aws') && !nameLower.includes('amazon') && !nameLower.includes('dup') && !nameLower.includes('vk')) {
     vendor = cleanName || 'Unrecognized Vendor'
+    vendorAddress = ''
+    vendorEmail = ''
     invNumber = 'N/A'
     date = '-'
     due = '-'
@@ -175,6 +182,8 @@ function getFallbackInvoiceData(fileName, index) {
     fileName,
     vendorName: vendor,
     vendorGstin: gstin,
+    vendorAddress: vendorAddress || '',
+    vendorEmail: vendorEmail || '',
     invoiceNumber: invNumber,
     invoiceDate: date,
     dueDate: due,
@@ -228,6 +237,7 @@ export function UploadInvoice() {
   const [selectedInvoice, setSelectedInvoice] = useState(null) // Modal details view
   const [overrideModalInvoice, setOverrideModalInvoice] = useState(null) // Duplication override modal
   const [confirmApprovalInvoice, setConfirmApprovalInvoice] = useState(null) // Confirmation modal before approval
+  const [confirmRejectInvoice, setConfirmRejectInvoice] = useState(null) // Confirmation modal before rejection/cancel
 
   // Finance Team Manual Editing inside Extraction Modal
   const [isEditingModal, setIsEditingModal] = useState(false)
@@ -242,6 +252,8 @@ export function UploadInvoice() {
       invoiceDate: target.invoiceDate && target.invoiceDate !== '-' ? target.invoiceDate : '',
       dueDate: target.dueDate && target.dueDate !== '-' && target.dueDate !== 'null' ? target.dueDate : '',
       vendorGstin: target.vendorGstin && target.vendorGstin !== '-' && target.vendorGstin !== 'N/A' ? target.vendorGstin : '',
+      vendorAddress: target.vendorAddress && target.vendorAddress !== '-' ? target.vendorAddress : '',
+      vendorEmail: target.vendorEmail && target.vendorEmail !== '-' ? target.vendorEmail : '',
       poNumber: target.poNumber && target.poNumber !== '-' && target.poNumber !== 'N/A' ? target.poNumber : '',
       subtotal: target.subtotal || 0,
       gst: target.gst || target.gstAmount || 0,
@@ -259,6 +271,8 @@ export function UploadInvoice() {
       invoiceDate: editModalData.invoiceDate || selectedInvoice.invoiceDate,
       dueDate: editModalData.dueDate || selectedInvoice.dueDate,
       vendorGstin: editModalData.vendorGstin || selectedInvoice.vendorGstin,
+      vendorAddress: editModalData.vendorAddress || selectedInvoice.vendorAddress,
+      vendorEmail: editModalData.vendorEmail || selectedInvoice.vendorEmail,
       poNumber: editModalData.poNumber || selectedInvoice.poNumber,
       subtotal: Number(editModalData.subtotal) || selectedInvoice.subtotal,
       gst: Number(editModalData.gst) || selectedInvoice.gst,
@@ -413,6 +427,12 @@ export function UploadInvoice() {
               fileName: fileItem.name,
               vendorName: apiInv.vendorName || (isValid ? 'Extracted Vendor' : 'Unrecognized Vendor / Invalid Invoice'),
               vendorGstin: apiInv.vendorGstin || '',
+              vendorAddress: apiInv.vendorAddress || '',
+              vendorEmail: apiInv.vendorEmail || '',
+              buyerName: apiInv.buyerName || '',
+              buyerGstin: apiInv.buyerGstin || '',
+              buyerAddress: apiInv.buyerAddress || '',
+              buyerEmail: apiInv.buyerEmail || '',
               invoiceNumber: apiInv.invoiceNumber || (isValid ? 'INV-001' : 'N/A'),
               invoiceDate: apiInv.invoiceDate
                 ? typeof apiInv.invoiceDate === 'string' && !apiInv.invoiceDate.includes('T')
@@ -571,8 +591,12 @@ export function UploadInvoice() {
       mongoId: inv.mongoId || (inv.id && String(inv.id).length === 24 ? inv.id : null),
       vendorName: inv.vendorName,
       vendorGstin: inv.vendorGstin,
+      vendorAddress: inv.vendorAddress,
+      vendorEmail: inv.vendorEmail,
       buyerName: inv.buyerName,
       buyerGstin: inv.buyerGstin,
+      buyerAddress: inv.buyerAddress,
+      buyerEmail: inv.buyerEmail,
       poNumber: inv.poNumber,
       invoiceNumber: inv.invoiceNumber,
       invoiceDate: inv.invoiceDate,
@@ -623,8 +647,12 @@ export function UploadInvoice() {
       mongoId: inv.mongoId || (inv.id && String(inv.id).length === 24 ? inv.id : null),
       vendorName: inv.vendorName,
       vendorGstin: inv.vendorGstin,
+      vendorAddress: inv.vendorAddress,
+      vendorEmail: inv.vendorEmail,
       buyerName: inv.buyerName,
       buyerGstin: inv.buyerGstin,
+      buyerAddress: inv.buyerAddress,
+      buyerEmail: inv.buyerEmail,
       poNumber: inv.poNumber,
       invoiceNumber: inv.invoiceNumber,
       invoiceDate: inv.invoiceDate,
@@ -1007,7 +1035,7 @@ export function UploadInvoice() {
       {/* 3. VIEW DETAILS & DOCUMENT PREVIEW MODAL */}
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
-          <div className="relative w-full max-w-4xl rounded-3xl bg-white p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-5xl rounded-3xl bg-white p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
               <div className="flex items-center gap-3">
@@ -1016,10 +1044,10 @@ export function UploadInvoice() {
                 </div>
                 <div>
                   <h2 className="text-lg font-black text-slate-900 leading-tight">
-                    {selectedInvoice.vendorName}
+                    Invoice #{selectedInvoice.invoiceNumber || '-'} Details
                   </h2>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400 font-medium">
-                    <span className="font-mono font-bold text-blue-600">#{selectedInvoice.invoiceNumber}</span>
+                    <span className="font-semibold text-slate-700">{selectedInvoice.vendorName}</span>
                     <span>•</span>
                     <span>File: {selectedInvoice.fileName}</span>
                   </div>
@@ -1027,7 +1055,10 @@ export function UploadInvoice() {
               </div>
 
               <button
-                onClick={() => setSelectedInvoice(null)}
+                onClick={() => {
+                  setSelectedInvoice(null)
+                  setIsEditingModal(false)
+                }}
                 className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               >
                 <X className="h-5 w-5" />
@@ -1083,14 +1114,14 @@ export function UploadInvoice() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-bold text-amber-900">
                       <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span>Unextracted / Missing Fields Warning ({missingMandatory.length + missingOptional.length})</span>
+                      <span>Unextracted / Missing Fields Checklist ({missingMandatory.length + missingOptional.length})</span>
                     </div>
                     {!isEditingModal && (
                       <button
                         onClick={() => startEditingModal(inv)}
                         className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-2xs hover:bg-amber-700 transition"
                       >
-                        <Edit3 className="h-3 w-3" /> Fill / Edit Missing Fields
+                        <Edit3 className="h-3 w-3" /> Edit / Correct Data
                       </button>
                     )}
                   </div>
@@ -1110,16 +1141,16 @@ export function UploadInvoice() {
               )
             })()}
 
-            {/* Split Content: Bill Left (7 cols), Document & Actions Right (5 cols) */}
+            {/* Split Content: Bill Details (7 cols), Document & Actions Right (5 cols) */}
             <div className="grid gap-6 md:grid-cols-12">
-              {/* LEFT SIDE: Clean Bill Card OR Inline Edit Form */}
-              <div className="md:col-span-7 flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-5 space-y-4 shadow-2xs">
+              {/* LEFT SIDE: Exact InvoiceDetails.jsx Master Record layout */}
+              <div className="md:col-span-7 flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 space-y-5 shadow-2xs">
                 {isEditingModal && editModalData ? (
-                  /* FINANCE TEAM EDIT FORM */
+                  /* FINANCE EDIT FORM */
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                       <h3 className="text-xs font-extrabold uppercase text-blue-700 tracking-wider">
-                        Edit Extracted Details (Finance Team)
+                        Edit Extracted Invoice Details
                       </h3>
                       <button
                         onClick={() => setIsEditingModal(false)}
@@ -1131,7 +1162,7 @@ export function UploadInvoice() {
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1">Vendor Name</label>
+                        <label className="font-bold text-slate-700 block mb-1">Vendor / Client Name</label>
                         <input
                           type="text"
                           value={editModalData.vendorName}
@@ -1167,7 +1198,7 @@ export function UploadInvoice() {
                         />
                       </div>
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1">Vendor GSTIN</label>
+                        <label className="font-bold text-slate-700 block mb-1">GSTIN</label>
                         <input
                           type="text"
                           value={editModalData.vendorGstin}
@@ -1176,11 +1207,20 @@ export function UploadInvoice() {
                         />
                       </div>
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1">P.O. Number</label>
+                        <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+                        <input
+                          type="email"
+                          value={editModalData.vendorEmail}
+                          onChange={(e) => setEditModalData({ ...editModalData, vendorEmail: e.target.value })}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="font-bold text-slate-700 block mb-1">Address</label>
                         <input
                           type="text"
-                          value={editModalData.poNumber}
-                          onChange={(e) => setEditModalData({ ...editModalData, poNumber: e.target.value })}
+                          value={editModalData.vendorAddress}
+                          onChange={(e) => setEditModalData({ ...editModalData, vendorAddress: e.target.value })}
                           className="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-900 bg-white"
                         />
                       </div>
@@ -1221,149 +1261,139 @@ export function UploadInvoice() {
                     </button>
                   </div>
                 ) : (
-                  /* STANDARD BILL READ-ONLY VIEW WITH EDIT BUTTON */
+                  /* EXACT INVOICE DETAILS READ-ONLY CARD */
                   <>
-                    <div>
-                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Vendor / Issuer</span>
-                            <button
-                              onClick={() => startEditingModal(selectedInvoice)}
-                              className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 hover:underline"
-                            >
-                              <Edit3 className="h-3 w-3" /> Edit
-                            </button>
-                          </div>
-                          <h3 className="text-base font-black text-slate-900 mt-0.5">{selectedInvoice.vendorName}</h3>
-                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                            Date: <strong className="text-slate-800">{selectedInvoice.invoiceDate || '-'}</strong>
-                            {selectedInvoice.dueDate && selectedInvoice.dueDate !== 'null' && selectedInvoice.dueDate !== '-' && (
-                              <span className="ml-2 text-amber-700 font-bold">Due: {selectedInvoice.dueDate}</span>
-                            )}
-                          </p>
-                        </div>
+                    {/* TOP HEADER BAR WITH SIMPLE AI EXTRACTION BADGE (GEMINI or OCR with %) */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Master Invoice Record</span>
+                        <button
+                          onClick={() => startEditingModal(selectedInvoice)}
+                          className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 hover:underline"
+                        >
+                          <Edit3 className="h-3 w-3" /> Edit
+                        </button>
+                      </div>
+                      <span className="inline-flex items-center rounded-lg bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-extrabold text-slate-800 font-mono">
+                        {(selectedInvoice.extractionSource || 'GEMINI').toUpperCase()} {selectedInvoice.ocrConfidence || selectedInvoice.overallConfidenceScore || 95}%
+                      </span>
+                    </div>
 
-                        {/* Extraction Source & Confidence Badge */}
-                        <div className="flex flex-col items-end gap-1">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${selectedInvoice.extractionSource === 'OCR'
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
-                              }`}
-                          >
-                            {selectedInvoice.extractionSource === 'OCR' ? (
-                              <>
-                                <Zap className="h-3 w-3 text-emerald-600 fill-emerald-600" />
-                                Extracted by: OCR
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="h-3 w-3 text-indigo-600 fill-indigo-600" />
-                                Extracted by: Gemini AI
-                              </>
-                            )}
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                            Confidence: {selectedInvoice.ocrConfidence || selectedInvoice.overallConfidenceScore}%
-                          </span>
-                        </div>
+                    {/* SINGLE PARTY CARD: CLIENT'S DETAILS */}
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1.5 text-xs">
+                      <h3 className="text-blue-600 font-bold text-sm">Client's details:</h3>
+                      <p className="font-black text-slate-900 text-sm">
+                        {selectedInvoice.vendorName && selectedInvoice.vendorName !== 'Unknown Vendor' && selectedInvoice.vendorName !== 'Extracted Vendor' ? selectedInvoice.vendorName : '-'}
+                      </p>
+                      <div className="text-slate-600 font-medium space-y-1 pt-1">
+                        <p><strong className="text-slate-700 font-bold">Address: </strong>{selectedInvoice.vendorAddress && selectedInvoice.vendorAddress !== '-' ? selectedInvoice.vendorAddress : '-'}</p>
+                        <p><strong className="text-slate-700 font-bold">Email: </strong>{selectedInvoice.vendorEmail && selectedInvoice.vendorEmail !== '-' ? selectedInvoice.vendorEmail : '-'}</p>
+                        <p><strong className="text-slate-700 font-bold">GSTIN: </strong>{selectedInvoice.vendorGstin && selectedInvoice.vendorGstin !== 'N/A' && selectedInvoice.vendorGstin !== '-' ? selectedInvoice.vendorGstin : '-'}</p>
                       </div>
                     </div>
 
-                    {/* Item Table: Product Name, Qty, Price, Tax, Total_Price */}
-                    <div className="space-y-2">
-                      <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Item Breakdown</h4>
-                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="border-b border-slate-200 bg-slate-100/70 text-[10px] font-extrabold uppercase text-slate-500">
-                              <th className="py-2.5 px-3">Product Name</th>
-                              <th className="py-2.5 px-3 text-center">Qty</th>
-                              <th className="py-2.5 px-3 text-right">Price</th>
-                              <th className="py-2.5 px-3 text-right">Tax</th>
-                              <th className="py-2.5 px-3 text-right">Total_Price</th>
+                    {/* INVOICE NO & DATES ROW */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 pt-1 text-xs font-bold text-slate-700">
+                      <div className="space-y-1">
+                        <p>Invoice No : <span className="font-mono font-black text-slate-900">{selectedInvoice.invoiceNumber || '-'}</span></p>
+                        <p>Invoice Date : <span className="text-slate-900 font-semibold">{selectedInvoice.invoiceDate || '-'}</span></p>
+                      </div>
+                      <div className="text-right">
+                        <p>Due Date : <span className="text-slate-900 font-semibold">{selectedInvoice.dueDate && selectedInvoice.dueDate !== 'null' ? selectedInvoice.dueDate : '-'}</span></p>
+                      </div>
+                    </div>
+
+                    {/* LINE ITEMS TABLE (Item, Qty, Price, Tax, Subtotal) */}
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-slate-700">
+                            <th className="py-3 px-4">Item</th>
+                            <th className="py-3 px-4 text-center">Qty</th>
+                            <th className="py-3 px-4 text-right">Price</th>
+                            <th className="py-3 px-4 text-right">Tax</th>
+                            <th className="py-3 px-4 text-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                          {Array.isArray(selectedInvoice.lineItems) && selectedInvoice.lineItems.length > 0 ? (
+                            selectedInvoice.lineItems.map((item, idx) => {
+                              const itemName = item.description && item.description !== 'Line Item' && item.description !== 'N/A' ? item.description : '-'
+                              const qtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '' && item.quantity !== 0) ? item.quantity : '-'
+                              const priceVal = (item.unitPrice || item.rate) ? formatCurrency(item.unitPrice || item.rate, selectedInvoice.currency) : '-'
+                              const taxVal = (item.taxAmount || item.tax) ? formatCurrency(item.taxAmount || item.tax, selectedInvoice.currency) : (item.taxRate ? `${item.taxRate}%` : '-')
+                              const totalVal = (item.total || item.amount) ? formatCurrency(item.total || item.amount, selectedInvoice.currency) : '-'
+
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="py-3.5 px-4 font-bold text-slate-900">{itemName}</td>
+                                  <td className="py-3.5 px-4 text-center font-bold text-slate-700">{qtyVal}</td>
+                                  <td className="py-3.5 px-4 text-right text-slate-600">{priceVal}</td>
+                                  <td className="py-3.5 px-4 text-right text-slate-600">{taxVal}</td>
+                                  <td className="py-3.5 px-4 text-right font-bold text-slate-900">{totalVal}</td>
+                                </tr>
+                              )
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="py-3.5 px-4 text-center text-slate-400 font-medium">No line items extracted</td>
                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {Array.isArray(selectedInvoice.lineItems) && selectedInvoice.lineItems.length > 0 ? (
-                              selectedInvoice.lineItems.map((item, idx) => {
-                                const pName = item.description || item.productName || item.desc || '-'
-                                const qtyVal = (item.quantity !== undefined && item.quantity !== null && item.quantity !== '') ? item.quantity : '-'
-                                const priceVal = (item.unitPrice || item.rate) ? formatCurrency(item.unitPrice || item.rate, selectedInvoice.currency) : '-'
-                                const taxVal = (item.tax || item.taxAmount) ? formatCurrency(item.tax || item.taxAmount, selectedInvoice.currency) : (item.taxRate ? `${item.taxRate}%` : '-')
-                                const totalVal = (item.total || item.amount || item.totalPrice) ? formatCurrency(item.total || item.amount || item.totalPrice, selectedInvoice.currency) : '-'
-
-                                return (
-                                  <tr key={idx} className="hover:bg-slate-50/50 transition">
-                                    <td className="py-2.5 px-3 font-semibold text-slate-900">{pName}</td>
-                                    <td className="py-2.5 px-3 text-center font-bold text-slate-700">{qtyVal}</td>
-                                    <td className="py-2.5 px-3 text-right text-slate-600">{priceVal}</td>
-                                    <td className="py-2.5 px-3 text-right text-slate-600">{taxVal}</td>
-                                    <td className="py-2.5 px-3 text-right font-bold text-slate-900">{totalVal}</td>
-                                  </tr>
-                                )
-                              })
-                            ) : (
-                              <tr>
-                                <td colSpan={5} className="py-3 px-3 text-center text-slate-400 font-medium">No line items extracted</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
 
-                    {/* Bottom Summary: SubTotal, Tax (GST / SGST / Tax), TOTAL AMOUNT */}
-                    <div className="border-t border-slate-200/80 pt-3 space-y-1.5">
-                      {(() => {
-                        const effectiveSubtotal = Number(selectedInvoice.subtotal) || 0
-                        const effectiveTotal = Number(selectedInvoice.totalAmount) || 0
-                        let effectiveTax = Number(selectedInvoice.gst) || Number(selectedInvoice.cgst || 0) + Number(selectedInvoice.sgst || 0) + Number(selectedInvoice.igst || 0)
+                    {/* INVOICE SUMMARY BOX (RIGHT ALIGNED) */}
+                    <div className="flex flex-col items-end pt-2">
+                      <div className="w-full max-w-xs space-y-3">
+                        <div className="border-b border-slate-200 pb-2 text-center text-xs font-bold uppercase text-slate-800 tracking-wider">
+                          Invoice Summary
+                        </div>
 
-                        if (effectiveTotal > effectiveSubtotal && effectiveSubtotal > 0 && effectiveTax === 0) {
-                          effectiveTax = Math.round((effectiveTotal - effectiveSubtotal) * 100) / 100
-                        }
+                        <div className="space-y-2 text-xs font-semibold text-slate-600">
+                          {(() => {
+                            const effectiveSubtotal = Number(selectedInvoice.subtotal) || 0
+                            const effectiveTotal = Number(selectedInvoice.totalAmount || selectedInvoice.amount) || 0
+                            let effectiveTax = Number(selectedInvoice.gst) || Number(selectedInvoice.gstAmount || 0)
 
-                        return (
-                          <>
-                            <div className="flex items-center justify-between text-xs text-slate-600">
-                              <span className="font-bold text-slate-700">SubTotal:</span>
-                              <span className="font-semibold text-slate-900">
-                                {effectiveSubtotal > 0 ? formatCurrency(effectiveSubtotal, selectedInvoice.currency) : '-'}
-                              </span>
-                            </div>
+                            if (effectiveTotal > effectiveSubtotal && effectiveSubtotal > 0 && effectiveTax === 0) {
+                              effectiveTax = Math.round((effectiveTotal - effectiveSubtotal) * 100) / 100
+                            }
 
-                            <div className="flex items-center justify-between text-xs text-slate-600">
-                              <span className="font-bold text-slate-700">Tax (GST / SGST / Tax):</span>
-                              <span className="font-semibold text-slate-900">
-                                {effectiveTax > 0 ? formatCurrency(effectiveTax, selectedInvoice.currency) : '-'}
-                              </span>
-                            </div>
+                            return (
+                              <>
+                                <div className="flex justify-between items-center">
+                                  <span>Tax</span>
+                                  <span className="text-slate-900 font-bold">{effectiveTax > 0 ? formatCurrency(effectiveTax, selectedInvoice.currency) : '-'}</span>
+                                </div>
 
-                            <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
-                              <span className="font-extrabold uppercase">TOTAL AMOUNT:</span>
-                              <span className="text-base text-blue-700 font-black">
-                                {effectiveTotal > 0 ? formatCurrency(effectiveTotal, selectedInvoice.currency) : '-'}
-                              </span>
-                            </div>
-                          </>
-                        )
-                      })()}
+                                <div className="flex justify-between items-center">
+                                  <span>SubTotal</span>
+                                  <span className="text-slate-900 font-bold">{effectiveSubtotal > 0 ? formatCurrency(effectiveSubtotal, selectedInvoice.currency) : '-'}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm text-slate-900 font-black">
+                                  <span>Total</span>
+                                  <span className="text-blue-700 font-black">{effectiveTotal > 0 ? formatCurrency(effectiveTotal, selectedInvoice.currency) : '-'}</span>
+                                </div>
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* RIGHT SIDE: Document Image & Action Buttons */}
+              {/* RIGHT SIDE: Document Image & Actions */}
               <div className="md:col-span-5 flex flex-col justify-between space-y-4">
-                {/* Document Preview Image */}
                 <div className="space-y-2">
                   <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Document Preview</h4>
                   <DocumentViewer invoice={selectedInvoice} />
                 </div>
 
-                {/* Bottom Actions */}
+                {/* Modal Action Buttons: Pass for Approval, Not Pass for Approval, Close */}
                 <div className="pt-2 space-y-2 border-t border-slate-100">
                   <button
                     onClick={() => {
@@ -1374,24 +1404,21 @@ export function UploadInvoice() {
                     <Send className="h-4 w-4" /> Pass for Approval
                   </button>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedInvoice(null)}
-                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
-                    >
-                      Close (Not Now)
-                    </button>
+                  <button
+                    onClick={() => {
+                      setConfirmRejectInvoice(selectedInvoice)
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                  >
+                    <XCircle className="h-4 w-4" /> Not Pass for Approval
+                  </button>
 
-                    <button
-                      onClick={() => {
-                        removeFile(selectedInvoice.id)
-                        setSelectedInvoice(null)
-                      }}
-                      className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="w-full inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
@@ -1399,9 +1426,65 @@ export function UploadInvoice() {
         </div>
       )}
 
+      {/* 4. CONFIRMATION MODAL FOR REJECTING / NOT PASSING FOR APPROVAL */}
+      {confirmRejectInvoice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 font-bold">
+                  <XCircle className="h-6 w-6 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Confirm Rejection</h2>
+                  <p className="text-xs text-slate-400 font-medium">Invoice #{confirmRejectInvoice.invoiceNumber || 'N/A'}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setConfirmRejectInvoice(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                Are you sure you do <strong className="text-rose-700">NOT want to pass</strong> Invoice <strong className="text-blue-700">#{confirmRejectInvoice.invoiceNumber || 'N/A'}</strong> from <strong className="text-slate-900">{confirmRejectInvoice.vendorName}</strong> for approval?
+              </p>
+              <p className="text-xs text-slate-400 italic">
+                This draft card will be permanently deleted from your ingestion queue.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => setConfirmRejectInvoice(null)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const targetId = confirmRejectInvoice.id
+                  setConfirmRejectInvoice(null)
+                  setSelectedInvoice(null)
+                  removeFile(targetId)
+                  showToast('Invoice draft removed.', 'info')
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition"
+              >
+                <Trash2 className="h-4 w-4" /> Yes, Reject Draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CONFIRMATION MODAL FOR PASSING TO APPROVAL */}
       {confirmApprovalInvoice && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
@@ -1457,7 +1540,7 @@ export function UploadInvoice() {
 
       {/* 4. OVERRIDE DUPLICATE CONFIRMATION MODAL */}
       {overrideModalInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
           <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">

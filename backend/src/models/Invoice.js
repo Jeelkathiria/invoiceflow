@@ -27,11 +27,27 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    vendorAddress: {
+      type: String,
+      default: '',
+    },
+    vendorEmail: {
+      type: String,
+      default: '',
+    },
     buyerName: {
       type: String,
       default: '',
     },
     buyerGstin: {
+      type: String,
+      default: '',
+    },
+    buyerAddress: {
+      type: String,
+      default: '',
+    },
+    buyerEmail: {
       type: String,
       default: '',
     },

@@ -253,11 +253,32 @@ export function parseHeaderFields(rawText = '', lines = []) {
   const shippingMatch = text.match(SHIPPING_REGEX)
   const shippingCharges = shippingMatch ? parseNumber(shippingMatch[1]) : 0
 
+  // Vendor Email & Address Detection
+  const emailMatch = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/i)
+  const vendorEmail = emailMatch ? emailMatch[0] : ''
+
+  let vendorAddress = ''
+  for (const line of safeLines.slice(0, 15)) {
+    if (
+      /(?:plot|road|estate|street|nagar|marg|building|suite|floor|camp|victoria|layout|apartment|colony|industrial|gidc|hub|lane|phase|sector|\d{6})/i.test(line) &&
+      !line.toLowerCase().includes('tax invoice') &&
+      !line.toLowerCase().includes('gstin') &&
+      !line.toLowerCase().includes('invoice no')
+    ) {
+      vendorAddress = line.trim()
+      break
+    }
+  }
+
   return {
     vendorName,
     vendorGstin,
+    vendorAddress,
+    vendorEmail,
     buyerName,
     buyerGstin,
+    buyerAddress: '',
+    buyerEmail: '',
     invoiceNumber,
     poNumber,
     invoiceDate,

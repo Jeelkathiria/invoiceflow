@@ -183,8 +183,12 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
     : (data.invoiceNumber && data.invoiceNumber !== 'null' ? data.invoiceNumber : 'N/A')
 
   const vendorGstin = data.vendorGstin || ''
+  const vendorAddress = data.vendorAddress || ''
+  const vendorEmail = data.vendorEmail || ''
   const buyerName = data.buyerName || ''
   const buyerGstin = data.buyerGstin || ''
+  const buyerAddress = data.buyerAddress || ''
+  const buyerEmail = data.buyerEmail || ''
   const poNumber = data.poNumber || ''
   const invoiceDate = data.invoiceDate || (isValidInvoice ? fallback.invoiceDate : '-')
   const isValidDueDate = data.dueDate && data.dueDate !== 'null' && data.dueDate !== 'N/A' && data.dueDate !== 'undefined'
@@ -237,8 +241,12 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
     isInvoiceDocument: isValidInvoice,
     vendorName,
     vendorGstin,
+    vendorAddress,
+    vendorEmail,
     buyerName,
     buyerGstin,
+    buyerAddress,
+    buyerEmail,
     poNumber,
     invoiceNumber,
     invoiceDate,

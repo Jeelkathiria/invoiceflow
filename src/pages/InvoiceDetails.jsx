@@ -1006,30 +1006,16 @@ export function InvoiceDetails() {
                 </span>
               </div>
 
-              {/* TWO TOP PARTY CARDS: YOUR DETAILS (FROM) & CLIENT'S DETAILS (TO) */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* YOUR DETAILS: FROM */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
-                  <h3 className="text-blue-600 font-bold text-sm">Your details:</h3>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">FROM</span>
-                  <p className="font-black text-slate-900 text-sm">{invoice.vendorName && invoice.vendorName !== 'Unknown Vendor' ? invoice.vendorName : '-'}</p>
-                  <div className="text-slate-500 font-medium space-y-0.5">
-                    <p>{invoice.vendorGstin && invoice.vendorGstin !== 'N/A' && invoice.vendorGstin !== '-' ? `GSTIN: ${invoice.vendorGstin}` : '-'}</p>
-                    <p>{invoice.vendorAddress && invoice.vendorAddress !== '-' ? invoice.vendorAddress : '-'}</p>
-                  </div>
-                  <p className="text-slate-400 font-medium pt-1">{invoice.vendorEmail && invoice.vendorEmail !== '-' ? invoice.vendorEmail : '-'}</p>
-                </div>
-
-                {/* CLIENT'S DETAILS: TO */}
-                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
-                  <h3 className="text-blue-600 font-bold text-sm">Client's details:</h3>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">TO</span>
-                  <p className="font-black text-slate-900 text-sm">{invoice.buyerName && invoice.buyerName !== 'Unknown Buyer' ? invoice.buyerName : '-'}</p>
-                  <div className="text-slate-500 font-medium space-y-0.5">
-                    <p>{invoice.buyerGstin && invoice.buyerGstin !== 'N/A' && invoice.buyerGstin !== '-' ? `GSTIN: ${invoice.buyerGstin}` : '-'}</p>
-                    <p>{invoice.buyerAddress && invoice.buyerAddress !== '-' ? invoice.buyerAddress : '-'}</p>
-                  </div>
-                  <p className="text-slate-400 font-medium pt-1">{invoice.buyerEmail && invoice.buyerEmail !== '-' ? invoice.buyerEmail : '-'}</p>
+              {/* SINGLE PARTY CARD: CLIENT'S DETAILS */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1.5 text-xs">
+                <h3 className="text-blue-600 font-bold text-sm">Client's details:</h3>
+                <p className="font-black text-slate-900 text-sm">
+                  {invoice.vendorName && invoice.vendorName !== 'Unknown Vendor' && invoice.vendorName !== 'Extracted Vendor' ? invoice.vendorName : '-'}
+                </p>
+                <div className="text-slate-600 font-medium space-y-1 pt-1">
+                  <p><strong className="text-slate-700 font-bold">Address: </strong>{invoice.vendorAddress && invoice.vendorAddress !== '-' ? invoice.vendorAddress : '-'}</p>
+                  <p><strong className="text-slate-700 font-bold">Email: </strong>{invoice.vendorEmail && invoice.vendorEmail !== '-' ? invoice.vendorEmail : '-'}</p>
+                  <p><strong className="text-slate-700 font-bold">GSTIN: </strong>{invoice.vendorGstin && invoice.vendorGstin !== 'N/A' && invoice.vendorGstin !== '-' ? invoice.vendorGstin : '-'}</p>
                 </div>
               </div>
 
