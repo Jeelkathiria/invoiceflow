@@ -226,6 +226,7 @@ export function UploadInvoice() {
   const [warningMessage, setWarningMessage] = useState('')
   const [selectedInvoice, setSelectedInvoice] = useState(null) // Modal details view
   const [overrideModalInvoice, setOverrideModalInvoice] = useState(null) // Duplication override modal
+  const [confirmApprovalInvoice, setConfirmApprovalInvoice] = useState(null) // Confirmation modal before approval
 
   const isLoadedRef = useRef(false)
 
@@ -921,29 +922,10 @@ export function UploadInvoice() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => setSelectedInvoice(inv)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs"
                       >
-                        <Eye className="h-3.5 w-3.5 text-blue-600" /> Details
+                        <Eye className="h-3.5 w-3.5 text-blue-600" /> View Detail
                       </button>
-
-                      {inv.duplicate ? (
-                        <button
-                          onClick={() => setOverrideModalInvoice(inv)}
-                          className="inline-flex items-center gap-1 rounded-xl bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-2xs hover:bg-amber-700 transition"
-                        >
-                          <AlertTriangle className="h-3.5 w-3.5" /> Review
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => sendToApprovalQueue(inv)}
-                          className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-bold text-white shadow-2xs transition ${!inv.isValidInvoice || inv.totalAmount <= 0
-                              ? 'bg-amber-600 hover:bg-amber-700'
-                              : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
-                        >
-                          <Save className="h-3.5 w-3.5" /> Pass to Approval
-                        </button>
-                      )}
 
                       <button
                         onClick={() => removeFile(inv.id)}
@@ -1148,25 +1130,89 @@ export function UploadInvoice() {
                 <div className="pt-2 space-y-2 border-t border-slate-100">
                   <button
                     onClick={() => {
-                      sendToApprovalQueue(selectedInvoice)
-                      setSelectedInvoice(null)
+                      setConfirmApprovalInvoice(selectedInvoice)
                     }}
                     className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
                   >
-                    <Save className="h-4 w-4" /> Pass to Approval
+                    <Send className="h-4 w-4" /> Pass for Approval
                   </button>
 
-                  <button
-                    onClick={() => {
-                      removeFile(selectedInvoice.id)
-                      setSelectedInvoice(null)
-                    }}
-                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
-                  >
-                    <X className="h-3.5 w-3.5" /> Cancel Upload
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedInvoice(null)}
+                      className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                    >
+                      Close (Not Now)
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        removeFile(selectedInvoice.id)
+                        setSelectedInvoice(null)
+                      }}
+                      className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL FOR PASSING TO APPROVAL */}
+      {confirmApprovalInvoice && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 font-bold">
+                  <Send className="h-6 w-6 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Confirm Approval Submission</h2>
+                  <p className="text-xs text-slate-400 font-medium">Invoice #{confirmApprovalInvoice.invoiceNumber || 'N/A'}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setConfirmApprovalInvoice(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                Are you sure you want to pass Invoice <strong className="text-blue-700">#{confirmApprovalInvoice.invoiceNumber || 'N/A'}</strong> from <strong className="text-slate-900">{confirmApprovalInvoice.vendorName}</strong> ({formatCurrency(confirmApprovalInvoice.totalAmount || confirmApprovalInvoice.amount, confirmApprovalInvoice.currency)}) to the Manager Approval Queue?
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => setConfirmApprovalInvoice(null)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const target = confirmApprovalInvoice
+                  setConfirmApprovalInvoice(null)
+                  setSelectedInvoice(null)
+                  if (target.duplicate) {
+                    handleOverrideApprove(target)
+                  } else {
+                    sendToApprovalQueue(target)
+                  }
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Yes, Pass for Approval
+              </button>
             </div>
           </div>
         </div>
@@ -1256,6 +1302,7 @@ export function UploadInvoice() {
             </div>
           </div>
         </div>
-      )}    </div>
+      )}
+    </div>
   )
 }
