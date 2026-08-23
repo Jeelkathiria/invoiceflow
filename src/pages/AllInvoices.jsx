@@ -427,31 +427,13 @@ export function AllInvoices() {
 
                     {/* Action Controls */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end">
                         <Link
                           to={`/app/invoice/${inv._id}`}
-                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
                         >
                           <Eye className="h-3.5 w-3.5 text-blue-600" /> View Details
                         </Link>
-
-                        {inv.status !== 'Approved' && inv.status !== 'PAID' && inv.status !== 'Paid' && inv.status !== 'PAYMENT_QUEUE' && (
-                          <button
-                            onClick={() => handleUpdateStatus(inv, 'Approved')}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition"
-                            title="Approve Invoice"
-                          >
-                            <Check className="h-4 w-4 stroke-[3]" />
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNumber)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
-                          title="Delete Invoice"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </div>
                     </td>
                   </tr>
