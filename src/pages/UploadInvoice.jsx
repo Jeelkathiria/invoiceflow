@@ -254,7 +254,6 @@ export function UploadInvoice() {
       vendorGstin: target.vendorGstin && target.vendorGstin !== '-' && target.vendorGstin !== 'N/A' ? target.vendorGstin : '',
       vendorAddress: target.vendorAddress && target.vendorAddress !== '-' ? target.vendorAddress : '',
       vendorEmail: target.vendorEmail && target.vendorEmail !== '-' ? target.vendorEmail : '',
-      poNumber: target.poNumber && target.poNumber !== '-' && target.poNumber !== 'N/A' ? target.poNumber : '',
       subtotal: target.subtotal || 0,
       gst: target.gst || target.gstAmount || 0,
       totalAmount: target.totalAmount || target.amount || 0,
@@ -273,7 +272,6 @@ export function UploadInvoice() {
       vendorGstin: editModalData.vendorGstin || selectedInvoice.vendorGstin,
       vendorAddress: editModalData.vendorAddress || selectedInvoice.vendorAddress,
       vendorEmail: editModalData.vendorEmail || selectedInvoice.vendorEmail,
-      poNumber: editModalData.poNumber || selectedInvoice.poNumber,
       subtotal: Number(editModalData.subtotal) || selectedInvoice.subtotal,
       gst: Number(editModalData.gst) || selectedInvoice.gst,
       totalAmount: Number(editModalData.totalAmount) || selectedInvoice.totalAmount,
@@ -500,6 +498,33 @@ export function UploadInvoice() {
         }
       }
 
+      // Cross-check for duplicate in current batch or list
+      if (!extractedResult.duplicate && extractedResult.invoiceNumber && extractedResult.vendorName) {
+        const invNum = String(extractedResult.invoiceNumber).trim().toLowerCase()
+        const vend = String(extractedResult.vendorName).trim().toLowerCase()
+        if (invNum !== 'n/a' && invNum !== '' && invNum !== 'inv-001') {
+          const priorMatch = [...newExtractedResults, ...extractedInvoices].find(
+            (prevInv) =>
+              prevInv.id !== extractedResult.id &&
+              prevInv.invoiceNumber &&
+              String(prevInv.invoiceNumber).trim().toLowerCase() === invNum &&
+              prevInv.vendorName &&
+              String(prevInv.vendorName).trim().toLowerCase() === vend
+          )
+          if (priorMatch) {
+            extractedResult.duplicate = true
+            extractedResult.matchedInvoice = {
+              invoiceNumber: priorMatch.invoiceNumber,
+              vendorName: priorMatch.vendorName,
+              amount: priorMatch.amount || priorMatch.totalAmount,
+              status: 'ALREADY SUBMITTED & PENDING APPROVAL',
+              sentBy: 'Finance Executive',
+              reason: `Duplicate invoice detected. Matches Invoice #${priorMatch.invoiceNumber} from ${priorMatch.vendorName}.`,
+            }
+          }
+        }
+      }
+
       newExtractedResults.push(extractedResult)
       const resToInsert = extractedResult
 
@@ -597,7 +622,6 @@ export function UploadInvoice() {
       buyerGstin: inv.buyerGstin,
       buyerAddress: inv.buyerAddress,
       buyerEmail: inv.buyerEmail,
-      poNumber: inv.poNumber,
       invoiceNumber: inv.invoiceNumber,
       invoiceDate: inv.invoiceDate,
       dueDate: inv.dueDate,
@@ -653,7 +677,6 @@ export function UploadInvoice() {
       buyerGstin: inv.buyerGstin,
       buyerAddress: inv.buyerAddress,
       buyerEmail: inv.buyerEmail,
-      poNumber: inv.poNumber,
       invoiceNumber: inv.invoiceNumber,
       invoiceDate: inv.invoiceDate,
       dueDate: inv.dueDate,
@@ -917,12 +940,13 @@ export function UploadInvoice() {
             {extractedInvoices.map((inv) => (
               <div
                 key={inv.id}
-                className={`rounded-2xl border bg-white p-3.5 shadow-2xs transition hover:shadow-md ${!inv.isValidInvoice || (inv.missingMandatoryFields && inv.missingMandatoryFields.length > 0)
+                className={`rounded-2xl border p-3.5 shadow-2xs transition hover:shadow-md ${
+                  inv.duplicate || inv.duplicateRisk
+                    ? 'border-red-300 ring-1 ring-red-200 bg-red-50'
+                    : !inv.isValidInvoice || (inv.missingMandatoryFields && inv.missingMandatoryFields.length > 0)
                     ? 'border-rose-300 ring-1 ring-rose-200 bg-rose-50/10'
-                    : inv.duplicate
-                      ? 'border-amber-300 ring-1 ring-amber-200 bg-amber-50/10'
-                      : 'border-slate-200'
-                  }`}
+                    : 'border-slate-200 bg-white'
+                }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   {/* Left: Icon, Vendor, Inv#, Source & Confidence */}
@@ -1095,9 +1119,6 @@ export function UploadInvoice() {
               }
               if (!inv.dueDate || inv.dueDate === 'null' || inv.dueDate === '-') {
                 missingOptional.push('Due Date')
-              }
-              if (!inv.poNumber || inv.poNumber === 'N/A' || inv.poNumber === '-') {
-                missingOptional.push('P.O. Number')
               }
               if (!Number(inv.subtotal)) {
                 missingOptional.push('Subtotal')

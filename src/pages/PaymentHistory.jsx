@@ -47,7 +47,11 @@ export function PaymentHistory() {
         amount: inv.amount || inv.totalAmount || 0,
         currency: inv.currency || 'INR',
         approvedBy: inv.approvedBy?.name || 'Finance Manager',
-        paidBy: inv.paidBy?.name || 'Finance Executive',
+        paidBy:
+          inv.paidBy?.name ||
+          (typeof inv.paidBy === 'string' && !/^[0-9a-fA-F]{24}$/.test(inv.paidBy)
+            ? inv.paidBy
+            : 'Finance Executive'),
         paidAt: inv.paidAt ? new Date(inv.paidAt).toLocaleString() : inv.updatedAt ? new Date(inv.updatedAt).toLocaleDateString() : '-',
         rawPaidAt: inv.paidAt || inv.updatedAt,
         status: inv.status || 'PAID',
@@ -69,7 +73,11 @@ export function PaymentHistory() {
             amount: inv.amount || inv.totalAmount || 0,
             currency: inv.currency || 'INR',
             approvedBy: inv.approvedBy?.name || 'Finance Manager',
-            paidBy: inv.paidBy?.name || 'Finance Executive',
+            paidBy:
+              inv.paidBy?.name ||
+              (typeof inv.paidBy === 'string' && !/^[0-9a-fA-F]{24}$/.test(inv.paidBy)
+                ? inv.paidBy
+                : 'Finance Executive'),
             paidAt: inv.paidAt ? new Date(inv.paidAt).toLocaleString() : inv.updatedAt ? new Date(inv.updatedAt).toLocaleDateString() : '-',
             rawPaidAt: inv.paidAt || inv.updatedAt,
             status: inv.status || 'PAID',

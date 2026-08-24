@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Eye,
   Trash2,
+  Wrench,
   Check,
   X,
   ShieldCheck
@@ -34,7 +35,7 @@ const formatDate = (dateStr) => {
 export function AllInvoices() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('Pending')
+  const [activeTab, setActiveTab] = useState('All')
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
@@ -94,32 +95,27 @@ export function AllInvoices() {
     setCurrentPage(1)
   }, [activeTab, searchTerm])
 
-  // Only invoices that have been sent for approval by Finance (excluding Drafts)
+  // Show ONLY invoices that have been paid by Finance
   const submittedInvoices = useMemo(() => {
-    return invoices.filter((inv) => inv.status && inv.status.toLowerCase() !== 'draft')
+    return invoices.filter((inv) => {
+      if (!inv.status) return false
+      const st = inv.status.toLowerCase()
+      return st === 'paid'
+    })
   }, [invoices])
 
   // Filtered dataset
   const filteredInvoices = useMemo(() => {
     return submittedInvoices.filter((inv) => {
-      const matchesTab =
-        activeTab === 'All'
-          ? true
-          : activeTab === 'Flagged'
-          ? inv.duplicate || inv.confidenceScore < 80
-          : activeTab === 'Approved'
-          ? (inv.status === 'Approved' || inv.status === 'PAYMENT_QUEUE' || inv.status === 'PAID' || inv.status === 'Paid')
-          : inv.status === activeTab
-
       const matchesSearch =
         (inv.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (inv.vendorName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (inv.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (inv.vendorGstin || '').toLowerCase().includes(searchTerm.toLowerCase())
 
-      return matchesTab && matchesSearch
+      return matchesSearch
     })
-  }, [submittedInvoices, activeTab, searchTerm])
+  }, [submittedInvoices, searchTerm])
 
   // Pagination calculation (12 items per page)
   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE) || 1
@@ -217,16 +213,21 @@ export function AllInvoices() {
       {/* Header Row */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">Master Invoice Ledger</h1>
-          <p className="text-xs text-slate-500 font-medium">Browse, inspect, filter and manage all parsed invoices in MongoDB</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">All Invoices</h1>
+            <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+              Paid Invoices Ledger
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-medium">Completed archive of invoices fully disbursed and paid by finance</p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 shadow-sm text-right">
-            <span className="text-[10px] font-bold uppercase text-slate-400">Total Filtered Value</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400">Total Paid Value</span>
             <div className="flex items-center justify-end gap-2">
               <p className="text-sm font-black text-slate-900">{filteredTotals.formattedInr}</p>
-              <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-extrabold text-blue-700">
+              <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-extrabold text-emerald-700">
                 {filteredTotals.formattedUsd}
               </span>
             </div>
@@ -247,50 +248,21 @@ export function AllInvoices() {
         </div>
       </div>
 
-      {/* Filter Tabs & Search Bar */}
+      {/* Filter & Search Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        {/* Tabs */}
-        <div className="flex flex-wrap items-center gap-1">
-          {['Pending', 'Rejected', 'Approved', 'Flagged', 'All'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
-                activeTab === tab
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <span>{tab}</span>
-              <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono font-extrabold ${
-                  activeTab === tab
-                    ? 'bg-white/20 text-white'
-                    : 'bg-slate-200/70 text-slate-700'
-                }`}
-              >
-                {tab === 'All'
-                  ? submittedInvoices.length
-                  : tab === 'Pending'
-                  ? submittedInvoices.filter((i) => i.status === 'Pending').length
-                  : tab === 'Rejected'
-                  ? submittedInvoices.filter((i) => i.status === 'Rejected').length
-                  : tab === 'Approved'
-                  ? submittedInvoices.filter((i) => i.status === 'Approved' || i.status === 'PAYMENT_QUEUE' || i.status === 'PAID' || i.status === 'Paid').length
-                  : submittedInvoices.filter((i) => i.duplicate || i.confidenceScore < 80).length}
-              </span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-bold text-slate-700">Disbursed Invoices ({submittedInvoices.length})</span>
         </div>
 
         {/* Search */}
-        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition w-full sm:w-64">
+        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition w-full sm:w-72">
           <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search vendor, ID, category..."
+            placeholder="Search vendor, invoice ID, category..."
             className="ml-2 w-full bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400"
           />
         </div>
@@ -320,7 +292,14 @@ export function AllInvoices() {
                 </tr>
               ) : (
                 paginatedInvoices.map((inv) => (
-                  <tr key={inv._id} className="transition hover:bg-slate-50/80">
+                  <tr
+                    key={inv._id}
+                    className={`transition ${
+                      inv.duplicate || inv.duplicateRisk || inv.aiFlag === 'Duplicate Risk'
+                        ? 'bg-red-50 hover:bg-red-100/90 border-l-4 border-l-red-500'
+                        : 'hover:bg-slate-50/80'
+                    }`}
+                  >
                     {/* ID & Vendor */}
                     <td className="py-3.5 px-4">
                       <span className="font-mono font-bold text-blue-600">{inv.invoiceNumber}</span>
@@ -427,13 +406,32 @@ export function AllInvoices() {
 
                     {/* Action Controls */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end gap-2">
                         <Link
                           to={`/app/invoice/${inv._id}`}
                           className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
                         >
                           <Eye className="h-3.5 w-3.5 text-blue-600" /> View Details
                         </Link>
+
+                        {(inv.status === 'NEEDS_CORRECTION' || inv.status === 'Needs Correction') && (
+                          <Link
+                            to={`/app/invoice/${inv._id}`}
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition shadow-2xs"
+                          >
+                            <Wrench className="h-3.5 w-3.5 text-amber-600" /> Fix & Resubmit
+                          </Link>
+                        )}
+
+                        {(inv.status === 'Rejected' || inv.status === 'DUPLICATE_SUBMISSION' || inv.status === 'ALREADY_PAID') && (
+                          <button
+                            onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNumber)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-2xs"
+                            title="Delete rejected invoice"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

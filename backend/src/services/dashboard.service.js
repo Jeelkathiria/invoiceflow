@@ -50,6 +50,11 @@ export const getDashboardStats = async ({ user, timeframe, startDate, endDate })
     { $group: { _id: null, total: { $sum: '$amount' }, avgConfidence: { $avg: '$confidenceScore' } } },
   ])
 
+  const approvedTotalAgg = await Invoice.aggregate([
+    { $match: { ...query, status: { $in: ['Approved', 'APPROVED', 'PAYMENT_QUEUE', 'Paid', 'PAID'] } } },
+    { $group: { _id: null, total: { $sum: '$amount' } } },
+  ])
+
   const paymentQueueAmountAgg = await Invoice.aggregate([
     { $match: { ...query, status: 'PAYMENT_QUEUE' } },
     { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -100,6 +105,7 @@ export const getDashboardStats = async ({ user, timeframe, startDate, endDate })
   })
 
   const totalAmount = totalAmountAgg[0]?.total || 0
+  const approvedVolumeAmount = approvedTotalAgg[0]?.total || 0
   const paymentQueueAmount = paymentQueueAmountAgg[0]?.total || 0
   const paidTotalAmount = paidTotalAgg[0]?.total || 0
   const paidThisMonthAmount = paidThisMonthAgg[0]?.total || 0
@@ -114,6 +120,7 @@ export const getDashboardStats = async ({ user, timeframe, startDate, endDate })
     rejectedInvoices: rejectedCount,
     duplicateAlerts: duplicateCount,
     totalVolumeAmount: totalAmount,
+    approvedVolumeAmount,
     aiConfidenceScore: avgConfidence,
     paymentQueueCount,
     paymentQueueAmount,
@@ -150,11 +157,93 @@ export const getActivityTimeline = async ({ user, limit = 10 }) => {
     query = { performedBy: user._id || user.id }
   }
 
-  return await ApprovalLog.find(query)
+  // 1. Fetch explicit approval/action logs
+  const logs = await ApprovalLog.find(query)
     .populate('performedBy', 'name email role avatar')
     .populate('invoiceId', 'invoiceNumber vendorName amount currency status')
     .sort({ timestamp: -1 })
     .limit(limit)
+
+  const formattedLogs = logs.map((l) => l.toObject())
+
+  // 2. Derive supplementary activity items from recent Invoices
+  let invoiceQuery = {}
+  if (isFinance) {
+    invoiceQuery = { uploadedBy: user._id || user.id }
+  }
+
+  const recentInvoices = await Invoice.find(invoiceQuery)
+    .populate('uploadedBy', 'name email role avatar')
+    .populate('paidBy', 'name email role avatar')
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .limit(10)
+
+  const invoiceActivities = []
+  for (const inv of recentInvoices) {
+    const invIdStr = inv._id.toString()
+    const invNumber = inv.invoiceNumber || 'INV-001'
+    const vendor = inv.vendorName || 'Vendor'
+    const amountStr = `₹${(inv.amount || 0).toLocaleString('en-IN')}`
+
+    const alreadyLogged = formattedLogs.some(
+      (l) => l.invoiceId?._id?.toString() === invIdStr || l.invoiceId === invIdStr
+    )
+
+    if (!alreadyLogged) {
+      let action = 'processed'
+      let comment = `Invoice status: ${inv.status || 'Updated'}`
+      let actor = inv.uploadedBy || { name: 'Finance Exec', role: 'finance' }
+
+      const st = (inv.status || '').toLowerCase()
+      if (st === 'paid') {
+        action = 'disbursed payment for'
+        comment = `Payment of ${amountStr} authorized and paid`
+        actor = inv.paidBy || inv.uploadedBy || { name: 'Finance Team', role: 'finance' }
+      } else if (st === 'approved' || st === 'payment_queue') {
+        action = 'approved invoice'
+        comment = `Manager approved ${invNumber} (${vendor} — ${amountStr})`
+        actor = { name: 'Finance Manager', role: 'manager' }
+      } else if (st === 'rejected' || st === 'needs_correction') {
+        action = 'rejected invoice'
+        comment = inv.managerComment || 'Invoice returned for corrections'
+        actor = { name: 'Finance Manager', role: 'manager' }
+      } else if (st === 'pending' || st === 'pending_approval') {
+        action = 'submitted for approval'
+        comment = `${invNumber} from ${vendor} sent to Manager approval queue`
+        actor = inv.uploadedBy || { name: 'Finance Exec', role: 'finance' }
+      } else {
+        action = 'ingested invoice'
+        comment = `Extracted data for ${invNumber} (${vendor})`
+        actor = inv.uploadedBy || { name: 'Finance Exec', role: 'finance' }
+      }
+
+      invoiceActivities.push({
+        _id: `inv_act_${inv._id}_${st}`,
+        invoiceId: {
+          _id: inv._id,
+          invoiceNumber: invNumber,
+          vendorName: vendor,
+          amount: inv.amount,
+          currency: inv.currency,
+          status: inv.status,
+        },
+        performedBy: actor,
+        action,
+        status: inv.status,
+        comment,
+        timestamp: inv.updatedAt || inv.createdAt || new Date(),
+      })
+    }
+  }
+
+  // Combine logs and generated activities, sort descending by time
+  const combined = [...formattedLogs, ...invoiceActivities].sort((a, b) => {
+    const timeA = new Date(a.timestamp || a.createdAt || 0).getTime()
+    const timeB = new Date(b.timestamp || b.createdAt || 0).getTime()
+    return timeB - timeA
+  })
+
+  return combined.slice(0, limit)
 }
 
 export const getFinanceTeamOverview = async () => {
@@ -171,7 +260,7 @@ export const getFinanceTeamOverview = async () => {
       const paid = await Invoice.countDocuments({ uploadedBy: uId, status: { $in: ['Paid', 'PAID'] } })
 
       const amountAgg = await Invoice.aggregate([
-        { $match: { uploadedBy: uId } },
+        { $match: { uploadedBy: uId, status: { $in: ['Approved', 'APPROVED', 'PAYMENT_QUEUE', 'Paid', 'PAID'] } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ])
 
@@ -216,12 +305,12 @@ export const getRiskOverview = async () => {
   const lowConfidenceCount = await Invoice.countDocuments({ confidenceScore: { $lt: 80 } })
   const highValueCount = await Invoice.countDocuments({ amount: { $gte: 100000 } })
 
-  const queueInvoices = await Invoice.find({ status: 'PAYMENT_QUEUE' })
+  const allUnpaidInvoices = await Invoice.find({ status: { $nin: ['Paid', 'PAID'] } })
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   let overduePayments = 0
 
-  queueInvoices.forEach((inv) => {
+  allUnpaidInvoices.forEach((inv) => {
     if (inv.dueDate && !isNaN(new Date(inv.dueDate).getTime())) {
       const due = new Date(inv.dueDate)
       due.setHours(0, 0, 0, 0)

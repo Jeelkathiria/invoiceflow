@@ -91,7 +91,6 @@ Output ONLY a raw, valid JSON object matching this schema:
   "invoiceNumber": "string or null",
   "invoiceDate": "YYYY-MM-DD or string",
   "dueDate": "YYYY-MM-DD or null",
-  "poNumber": "string or null",
   "currency": "USD or INR or EUR or GBP",
   "paymentTerms": "string or null",
   "subtotal": number,
@@ -189,7 +188,6 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
   const buyerGstin = data.buyerGstin || ''
   const buyerAddress = data.buyerAddress || ''
   const buyerEmail = data.buyerEmail || ''
-  const poNumber = data.poNumber || ''
   const invoiceDate = data.invoiceDate || (isValidInvoice ? fallback.invoiceDate : '-')
   const isValidDueDate = data.dueDate && data.dueDate !== 'null' && data.dueDate !== 'N/A' && data.dueDate !== 'undefined'
   const dueDate = isValidDueDate ? data.dueDate : null
@@ -247,7 +245,6 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
     buyerGstin,
     buyerAddress,
     buyerEmail,
-    poNumber,
     invoiceNumber,
     invoiceDate,
     dueDate,
@@ -301,7 +298,6 @@ export function getFallbackInvoiceData(fileName = '') {
       vendorGstin: '24ABSFS0321B2ZL',
       buyerName: 'Shiv Engineering',
       buyerGstin: '32AABBA7890B1ZB',
-      poNumber: '33',
       invoiceNumber: 'GST-3425-26',
       invoiceDate: '2025-07-23',
       dueDate: '2025-08-07',
@@ -335,7 +331,6 @@ export function getFallbackInvoiceData(fileName = '') {
       vendorGstin: '',
       buyerName: 'Ms. Mary D. Dunton',
       buyerGstin: '',
-      poNumber: '',
       invoiceNumber: 'INV-000001',
       invoiceDate: '2024-08-05',
       dueDate: '2024-08-05',
@@ -379,7 +374,6 @@ export function getFallbackInvoiceData(fileName = '') {
       vendorGstin: '27AAACB1234C1Z5',
       buyerName: 'InvoiceFlow India Ltd',
       buyerGstin: '27AAACF5678D1Z2',
-      poNumber: 'PO-99120',
       invoiceNumber: '1',
       invoiceDate: '2021-12-15',
       dueDate: '2021-12-30',
@@ -411,7 +405,6 @@ export function getFallbackInvoiceData(fileName = '') {
     vendorGstin: '',
     buyerName: '',
     buyerGstin: '',
-    poNumber: '',
     invoiceNumber: 'N/A',
     invoiceDate: '-',
     dueDate: null,

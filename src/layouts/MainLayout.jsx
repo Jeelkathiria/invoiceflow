@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom'
-import { Bell, FileText, Home, ListChecks, LogOut, User, Search, Plus, Menu, X, PanelLeftClose, PanelLeftOpen, CreditCard, History, Users } from 'lucide-react'
+import { Bell, FileText, Home, ListChecks, LogOut, User, Search, Plus, Menu, X, PanelLeftClose, PanelLeftOpen, CreditCard, History, Users, Send } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { GlobalSearchModal } from '../components/common/GlobalSearchModal'
 import { NotificationDrawer } from '../components/common/NotificationDrawer'
@@ -12,8 +12,20 @@ export function MainLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setIsSearchOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -51,6 +63,7 @@ export function MainLayout() {
     : [
         { to: '/app', label: 'Dashboard', icon: Home, badge: null },
         { to: '/app/upload', label: 'Upload Invoice', icon: Plus, badge: null },
+        { to: '/app/sent-for-approval', label: 'Sent for Approval', icon: Send, badge: null },
         { to: '/app/payment-queue', label: 'Payment Queue', icon: CreditCard, badge: null },
         { to: '/app/payment-history', label: 'Payment History', icon: History, badge: null },
         { to: '/app/invoices', label: 'All Invoices', icon: FileText, badge: null },
@@ -59,7 +72,12 @@ export function MainLayout() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
-      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        query={searchQuery}
+        setQuery={setSearchQuery}
+      />
       <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
 
       {/* Mobile Top Navigation Header */}
@@ -182,15 +200,20 @@ export function MainLayout() {
         {/* Top Navbar */}
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-6 backdrop-blur-md">
           {/* Global Search Bar */}
-          <div
-            onClick={() => setIsSearchOpen(true)}
-            className="relative w-full max-w-md cursor-pointer"
-          >
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-12 text-xs text-slate-500">
-              Search invoices (INV-2026, Amazon, Pending)...
-            </div>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                if (!isSearchOpen) setIsSearchOpen(true)
+              }}
+              onFocus={() => setIsSearchOpen(true)}
+              placeholder="Search invoices (e.g. INV-2026, Vendor, Status, Amount)..."
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-12 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none transition shadow-2xs"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-400 select-none">
               ⌘K
             </span>
           </div>

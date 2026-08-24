@@ -22,6 +22,7 @@ const ITEMS_PER_PAGE = 12
 
 import { formatCurrency, calculateMultiCurrencyTotals } from '../utils/formatCurrency'
 import { RejectInvoiceModal } from '../components/invoice/RejectInvoiceModal'
+import { ApproveInvoiceModal } from '../components/invoice/ApproveInvoiceModal'
 
 export function ApprovalQueue() {
   const { user } = useAuth()
@@ -37,6 +38,8 @@ export function ApprovalQueue() {
   const [managerComment, setManagerComment] = useState('')
   const [selectedInvoiceToReject, setSelectedInvoiceToReject] = useState(null)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+  const [selectedInvoiceToApprove, setSelectedInvoiceToApprove] = useState(null)
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [toast, setToast] = useState(null)
 
   const showToast = (message, type = 'info') => {
@@ -104,6 +107,38 @@ export function ApprovalQueue() {
     setIsRejectModalOpen(true)
   }
 
+  const openApproveModal = (item) => {
+    setSelectedInvoiceToApprove(item)
+    setIsApproveModalOpen(true)
+  }
+
+  const handleConfirmApprove = async (comment) => {
+    const item = selectedInvoiceToApprove
+    if (!item) return
+
+    try {
+      if (item._id && !item._id.startsWith('inv-demo')) {
+        await api.put(`/invoices/${item._id}`, {
+          status: 'Approved',
+          comments: comment ? [comment] : managerComment ? [managerComment] : [],
+        })
+      }
+      setQueue((prev) =>
+        prev.map((i) => (i._id === item._id ? { ...i, status: 'Approved' } : i))
+      )
+      showToast(`Invoice #${item.invoiceNumber || item.id} Approved successfully!`, 'success')
+      fetchInvoices()
+    } catch (err) {
+      console.error('Failed to approve invoice:', err)
+      showToast(err.response?.data?.message || 'Failed to approve invoice', 'danger')
+    } finally {
+      setSelectedInvoiceToApprove(null)
+      setIsApproveModalOpen(false)
+      setSelectedModalInvoice(null)
+      setManagerComment('')
+    }
+  }
+
   const handleConfirmReject = async ({ rejectionReason, rejectionComment, relatedInvoiceId }) => {
     const item = selectedInvoiceToReject
     if (!item) return
@@ -158,17 +193,29 @@ export function ApprovalQueue() {
     }
   }
 
-  const duplicateCount = useMemo(() => queue.filter((i) => i.duplicate || i.aiFlag === 'Duplicate Risk').length, [queue])
+  const isDuplicateRiskItem = (item) => {
+    if (!item) return false
+    return Boolean(
+      item.duplicate ||
+      item.duplicateRisk ||
+      item.aiFlag === 'Duplicate Risk' ||
+      item.status === 'DUPLICATE_SUBMISSION' ||
+      item.matchedInvoice
+    )
+  }
+
+  const duplicateCount = useMemo(() => queue.filter((i) => isDuplicateRiskItem(i)).length, [queue])
 
   const filteredQueue = useMemo(() => {
     return queue.filter((item) => {
       if (item.status === 'Draft') return false
 
+      const isDup = isDuplicateRiskItem(item)
       let matchesFilter = true
       if (filter === 'Pending') {
-        matchesFilter = item.status === 'Pending' && !item.duplicate && item.aiFlag !== 'Duplicate Risk'
+        matchesFilter = (item.status === 'Pending' || item.status === 'PENDING_APPROVAL') && !isDup
       } else if (filter === 'Duplicate Risk') {
-        matchesFilter = Boolean(item.duplicate) || item.aiFlag === 'Duplicate Risk'
+        matchesFilter = isDup
       } else if (filter === 'Approved') {
         matchesFilter = item.status === 'Approved'
       } else if (filter === 'Rejected') {
@@ -191,9 +238,12 @@ export function ApprovalQueue() {
     return filteredQueue.slice(start, start + ITEMS_PER_PAGE)
   }, [filteredQueue, currentPage])
 
-  const pendingCount = queue.filter((i) => i.status === 'Pending' && !i.duplicate).length
+  const pendingCount = useMemo(
+    () => queue.filter((i) => (i.status === 'Pending' || i.status === 'PENDING_APPROVAL') && !isDuplicateRiskItem(i)).length,
+    [queue]
+  )
   const pendingTotals = useMemo(() => {
-    const pendingInvoices = queue.filter((i) => i.status === 'Pending' && !i.duplicate)
+    const pendingInvoices = queue.filter((i) => (i.status === 'Pending' || i.status === 'PENDING_APPROVAL') && !isDuplicateRiskItem(i))
     return calculateMultiCurrencyTotals(pendingInvoices)
   }, [queue])
 
@@ -309,7 +359,13 @@ export function ApprovalQueue() {
             ) : (
               paginatedQueue.map((item) => (
                 <Fragment key={item._id}>
-                  <tr className="hover:bg-slate-50/60 transition">
+                  <tr
+                    className={
+                      item.duplicate || item.aiFlag === 'Duplicate Risk' || item.duplicateRisk
+                        ? 'bg-red-50 hover:bg-red-100/90 border-l-4 border-l-red-500 transition'
+                        : 'hover:bg-slate-50/60 transition'
+                    }
+                  >
                     <td className="py-3 px-4 font-mono font-bold text-blue-600">{item.invoiceNumber}</td>
                     <td className="py-3 px-4">
                       <p className="font-extrabold text-slate-900">{item.vendorName}</p>
@@ -363,32 +419,13 @@ export function ApprovalQueue() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end">
                         <Link
                           to={`/app/invoice/${item._id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition shadow-2xs"
                         >
-                          <Eye className="h-3.5 w-3.5 text-blue-600" /> Review
+                          <Eye className="h-3.5 w-3.5 text-blue-600" /> View Detail
                         </Link>
-
-                        {item.status === 'Pending' && isManager && (
-                          <>
-                            <button
-                              onClick={() => handleAction(item, 'Approved')}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
-                              title="Approve Invoice"
-                            >
-                              <Check className="h-3.5 w-3.5 stroke-[3]" /> Approve
-                            </button>
-                            <button
-                              onClick={() => handleAction(item, 'Rejected')}
-                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
-                              title="Reject Invoice"
-                            >
-                              <X className="h-3.5 w-3.5 stroke-[3]" /> Reject
-                            </button>
-                          </>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -546,14 +583,14 @@ export function ApprovalQueue() {
               {selectedModalInvoice.status === 'Pending' && isManager && (
                 <>
                   <button
-                    onClick={() => handleAction(selectedModalInvoice, 'Approved')}
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+                    onClick={() => openApproveModal(selectedModalInvoice)}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
                   >
                     Approve Invoice
                   </button>
                   <button
                     onClick={() => handleAction(selectedModalInvoice, 'Rejected')}
-                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                   >
                     Reject Invoice
                   </button>
@@ -561,7 +598,7 @@ export function ApprovalQueue() {
               )}
               <button
                 onClick={() => setSelectedModalInvoice(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
               >
                 Close
               </button>
@@ -570,12 +607,20 @@ export function ApprovalQueue() {
         </div>
       )}
 
-      {/* SHADCN/UI BASED REJECT INVOICE MODAL */}
+      {/* REJECT INVOICE MODAL */}
       <RejectInvoiceModal
         isOpen={isRejectModalOpen}
         onClose={() => setIsRejectModalOpen(false)}
         invoice={selectedInvoiceToReject}
         onConfirm={handleConfirmReject}
+      />
+
+      {/* APPROVE INVOICE CONFIRMATION MODAL WITH HIGH Z-INDEX */}
+      <ApproveInvoiceModal
+        isOpen={isApproveModalOpen}
+        onClose={() => setIsApproveModalOpen(false)}
+        invoice={selectedInvoiceToApprove}
+        onConfirm={handleConfirmApprove}
       />
     </div>
   )

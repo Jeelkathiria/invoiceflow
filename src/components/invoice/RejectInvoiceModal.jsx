@@ -95,14 +95,26 @@ export function RejectInvoiceModal({ isOpen, onClose, invoice, onConfirm }) {
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
       <div className="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden my-8">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-gradient-to-r from-rose-50/50 via-white to-slate-50">
+        <div className={`flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-gradient-to-r ${
+          selectedReason === 'CORRECTION_REQUIRED'
+            ? 'from-amber-50/50 via-white to-slate-50'
+            : 'from-rose-50/50 via-white to-slate-50'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 font-extrabold shadow-2xs">
-              <AlertTriangle className="h-5 w-5" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-2xl font-extrabold shadow-2xs ${
+              selectedReason === 'CORRECTION_REQUIRED'
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-rose-100 text-rose-700'
+            }`}>
+              {selectedReason === 'CORRECTION_REQUIRED' ? <Wrench className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900">Reject Invoice</h2>
-              <p className="text-xs text-slate-500 font-medium">Select a reason for rejection</p>
+              <h2 className="text-base font-black text-slate-900">
+                {selectedReason === 'CORRECTION_REQUIRED' ? 'Send for Correction' : 'Reject Invoice'}
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                {selectedReason === 'CORRECTION_REQUIRED' ? 'Specify details for Finance to correct & edit' : 'Select a reason for rejection'}
+              </p>
             </div>
           </div>
           <button
@@ -371,12 +383,21 @@ export function RejectInvoiceModal({ isOpen, onClose, invoice, onConfirm }) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-extrabold shadow-lg shadow-rose-500/25 transition disabled:opacity-50"
+              className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl text-white text-xs font-extrabold shadow-lg transition active:scale-95 disabled:opacity-50 ${
+                selectedReason === 'CORRECTION_REQUIRED'
+                  ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/25'
+                  : 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/25'
+              }`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Processing...</span>
+                </>
+              ) : selectedReason === 'CORRECTION_REQUIRED' ? (
+                <>
+                  <Wrench className="h-4 w-4" />
+                  <span>Send for Correction</span>
                 </>
               ) : (
                 <span>Confirm Rejection</span>

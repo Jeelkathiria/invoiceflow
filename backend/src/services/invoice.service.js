@@ -285,6 +285,33 @@ export const saveInvoiceRecord = async (invoicePayload, userId) => {
     lineItems: sanitizedLineItems,
   }
 
+  // Dynamic Duplicate Check before saving to DB
+  let isDup = Boolean(invoicePayload.duplicate)
+  let matchedInv = invoicePayload.matchedInvoice || null
+
+  if (!isDup && invoiceData.vendorName && invoiceData.invoiceNumber) {
+    try {
+      const dupRes = await checkDuplicateInvoice(
+        invoiceData.vendorName,
+        invoiceData.invoiceNumber,
+        invoiceData.amount
+      )
+      if (dupRes.isDuplicate) {
+        const matchedId = String(dupRes.matchedInvoice?.id || '')
+        const currentId = String(invoicePayload.mongoId || invoicePayload._id || '')
+        if (!currentId || matchedId !== currentId) {
+          isDup = true
+          matchedInv = dupRes.matchedInvoice
+        }
+      }
+    } catch (e) {
+      console.warn('[saveInvoiceRecord Duplicate Check Error]:', e.message)
+    }
+  }
+
+  invoiceData.duplicate = isDup
+  invoiceData.matchedInvoice = matchedInv
+
   if (invoiceData._id && String(invoiceData._id).length !== 24) {
     delete invoiceData._id
   }
@@ -411,6 +438,7 @@ export const getInvoiceById = async (id, user = null) => {
     .populate('uploadedBy', 'name email role avatar')
     .populate('approvedBy', 'name email role avatar')
     .populate('rejectedBy', 'name email role avatar')
+    .populate('paidBy', 'name email role avatar')
     .populate('relatedInvoiceId', 'invoiceNumber vendorName amount currency status paidAt createdAt')
 
   if (!invoice) {
@@ -579,11 +607,7 @@ export const rejectInvoiceService = async (id, { rejectionReason, rejectionComme
   let newStatus = 'NEEDS_CORRECTION'
   if (reasonToSave === 'CORRECTION_REQUIRED' || reasonToSave === 'Correction Required') {
     newStatus = 'NEEDS_CORRECTION'
-  } else if (reasonToSave === 'ALREADY_SUBMITTED' || reasonToSave === 'Already Submitted') {
-    newStatus = 'DUPLICATE_SUBMISSION'
-  } else if (reasonToSave === 'ALREADY_PAID' || reasonToSave === 'Already Paid') {
-    newStatus = 'ALREADY_PAID'
-  } else if (reasonToSave === 'Rejected' || reasonToSave === 'REJECTED') {
+  } else {
     newStatus = 'Rejected'
   }
 
@@ -658,6 +682,7 @@ export const rejectInvoiceService = async (id, { rejectionReason, rejectionComme
     .populate('uploadedBy', 'name email role avatar')
     .populate('approvedBy', 'name email role avatar')
     .populate('rejectedBy', 'name email role avatar')
+    .populate('paidBy', 'name email role avatar')
     .populate('relatedInvoiceId', 'invoiceNumber vendorName amount currency status paidAt createdAt')
 }
 
@@ -690,8 +715,9 @@ export const resubmitInvoiceService = async (id, updatePayload, financeUser) => 
   }
 
   checkDiff('Vendor Name', invoice.vendorName, updatePayload.vendorName)
+  checkDiff('Vendor Email', invoice.vendorEmail, updatePayload.vendorEmail)
+  checkDiff('Vendor Address', invoice.vendorAddress, updatePayload.vendorAddress)
   checkDiff('Invoice Number', invoice.invoiceNumber, updatePayload.invoiceNumber)
-  checkDiff('PO Number', invoice.poNumber, updatePayload.poNumber)
   checkDiff('Grand Total', invoice.amount, amount)
   checkDiff('Subtotal', invoice.subtotal, updatePayload.subtotal)
   checkDiff('GST/Tax', invoice.gst, updatePayload.gst)
@@ -701,7 +727,6 @@ export const resubmitInvoiceService = async (id, updatePayload, financeUser) => 
     revisionNumber: invoice.revisionNumber || 1,
     vendorName: invoice.vendorName,
     invoiceNumber: invoice.invoiceNumber,
-    poNumber: invoice.poNumber,
     amount: invoice.amount,
     subtotal: invoice.subtotal,
     gst: invoice.gst,
@@ -726,7 +751,8 @@ export const resubmitInvoiceService = async (id, updatePayload, financeUser) => 
   invoice.vendorName = vendorName
   invoice.invoiceNumber = invoiceNumber
   if (updatePayload.vendorGstin !== undefined) invoice.vendorGstin = updatePayload.vendorGstin
-  if (updatePayload.poNumber !== undefined) invoice.poNumber = updatePayload.poNumber
+  if (updatePayload.vendorEmail !== undefined) invoice.vendorEmail = updatePayload.vendorEmail
+  if (updatePayload.vendorAddress !== undefined) invoice.vendorAddress = updatePayload.vendorAddress
   if (updatePayload.paymentTerms !== undefined) invoice.paymentTerms = updatePayload.paymentTerms
   if (updatePayload.invoiceDate) invoice.invoiceDate = parseSafeDate(updatePayload.invoiceDate, invoice.invoiceDate)
   if (updatePayload.dueDate) invoice.dueDate = parseOptionalDate(updatePayload.dueDate)

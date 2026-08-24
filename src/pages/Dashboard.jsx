@@ -66,10 +66,11 @@ export function Dashboard() {
   // Handle Finance "Mark as Paid" action
   const handleMarkAsPaid = async (invoiceId) => {
     try {
-      const res = await api.put(`/invoices/${invoiceId}/pay`)
+      await api.patch(`/invoices/${invoiceId}/mark-paid`)
       toast.success('Invoice marked as PAID by Finance!')
       fetchDashboardData()
     } catch (err) {
+      console.error('Failed to mark invoice as paid:', err)
       toast.error(err.response?.data?.message || 'Could not mark invoice as paid')
     }
   }

@@ -33,7 +33,11 @@ import {
   Check,
   Zap,
   ShieldAlert,
+  Trash2,
+  Loader2,
+  X,
 } from 'lucide-react'
+import api from '../../services/axios'
 import { formatCurrency } from '../../utils/formatCurrency'
 
 export function FinanceDashboardView({
@@ -50,6 +54,86 @@ export function FinanceDashboardView({
   // Timeframe state
   const [timeframe, setTimeframe] = useState('month')
   const [analyticsTab, setAnalyticsTab] = useState('value') // 'count' | 'value'
+
+  // Mark as Paid Confirmation Modal state
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState(null)
+  const [submittingPayment, setSubmittingPayment] = useState(false)
+
+  const handleConfirmPaymentModal = async () => {
+    if (!selectedInvoiceForPayment) return
+    setSubmittingPayment(true)
+    try {
+      if (onMarkAsPaid) {
+        await onMarkAsPaid(selectedInvoiceForPayment._id)
+      } else {
+        await api.patch(`/invoices/${selectedInvoiceForPayment._id}/mark-paid`)
+        if (onRefresh) onRefresh()
+      }
+    } catch (err) {
+      console.error('Payment failed:', err)
+    } finally {
+      setSubmittingPayment(false)
+      setSelectedInvoiceForPayment(null)
+    }
+  }
+
+  const handleDeleteInvoice = async (id, invoiceNumber) => {
+    if (!window.confirm(`Are you sure you want to delete rejected invoice ${invoiceNumber || ''}?`)) return
+    try {
+      if (id && !id.startsWith('inv-demo')) {
+        await api.delete(`/invoices/${id}`)
+      }
+      if (onRefresh) onRefresh()
+    } catch (err) {
+      console.error('Failed to delete invoice:', err)
+    }
+  }
+
+  // Combine activityTimeline with fallback generated activities to guarantee at least 3 recent activities
+  const effectiveActivities = useMemo(() => {
+    let list = Array.isArray(activityTimeline) ? [...activityTimeline] : []
+
+    if (list.length < 3 && Array.isArray(invoices) && invoices.length > 0) {
+      const fallbackItems = invoices.slice(0, 5).map((inv, idx) => {
+        const invNo = inv.invoiceNumber || `INV-${String(idx + 1).padStart(3, '0')}`
+        const vendor = inv.vendorName || 'Vendor'
+        const amt = (inv.amount || 0).toLocaleString('en-IN')
+        const st = (inv.status || '').toLowerCase()
+        let act = 'extracted & ingested'
+        let cmt = `Processed invoice data for ${vendor}`
+
+        if (st === 'paid') {
+          act = 'disbursed payment for'
+          cmt = `Payment of ₹${amt} completed by Finance`
+        } else if (st === 'approved' || st === 'payment_queue') {
+          act = 'approved'
+          cmt = `Manager approved invoice ₹${amt}`
+        } else if (st === 'pending' || st === 'pending_approval') {
+          act = 'submitted for manager approval'
+          cmt = `Invoice ${invNo} queued for approval`
+        } else if (st === 'rejected' || st === 'needs_correction') {
+          act = 'returned for corrections'
+          cmt = inv.managerComment || 'Invoice returned to Finance'
+        }
+
+        return {
+          _id: `fb_fin_act_${inv._id || idx}_${idx}`,
+          invoiceId: { invoiceNumber: invNo, vendorName: vendor, amount: inv.amount },
+          action: act,
+          comment: cmt,
+          timestamp: inv.updatedAt || inv.createdAt || new Date(Date.now() - (idx + 1) * 3600000),
+        }
+      })
+
+      const existingInvNos = new Set(list.map((l) => l.invoiceId?.invoiceNumber).filter(Boolean))
+      for (const fb of fallbackItems) {
+        if (!existingInvNos.has(fb.invoiceId.invoiceNumber)) {
+          list.push(fb)
+        }
+      }
+    }
+    return list.slice(0, 6)
+  }, [activityTimeline, invoices])
 
   // Table search & filter states
   const [approvalSearch, setApprovalSearch] = useState('')
@@ -224,11 +308,11 @@ export function FinanceDashboardView({
           <span>Upload Invoice</span>
         </button>
         <button
-          onClick={() => navigate('/app/approval-queue')}
+          onClick={() => navigate('/app/sent-for-approval')}
           className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition"
         >
-          <Clock className="h-3.5 w-3.5" />
-          <span>View Approval Queue</span>
+          <Clock className="h-3.5 w-3.5 text-amber-600" />
+          <span>Sent for Approval</span>
         </button>
         <button
           onClick={() => navigate('/app/payment-queue')}
@@ -388,8 +472,8 @@ export function FinanceDashboardView({
                 <button
                   onClick={() => setAnalyticsTab('count')}
                   className={`rounded-lg px-3 py-1 transition ${analyticsTab === 'count'
-                      ? 'bg-white text-blue-600 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-white text-blue-600 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900'
                     }`}
                 >
                   Invoice Count
@@ -397,8 +481,8 @@ export function FinanceDashboardView({
                 <button
                   onClick={() => setAnalyticsTab('value')}
                   className={`rounded-lg px-3 py-1 transition ${analyticsTab === 'value'
-                      ? 'bg-white text-blue-600 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-white text-blue-600 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900'
                     }`}
                 >
                   Invoice Value
@@ -415,6 +499,8 @@ export function FinanceDashboardView({
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#64748b', fontSize: 11 }}
+                    ticks={analyticsTab === 'count' ? [0, 5, 15, 25, 35] : undefined}
+                    domain={analyticsTab === 'count' ? [0, 35] : undefined}
                     tickFormatter={(val) =>
                       analyticsTab === 'value'
                         ? `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`
@@ -580,20 +666,31 @@ export function FinanceDashboardView({
                         <td className="py-2.5 px-2.5 text-center">
                           <span
                             className={`inline-block rounded-md px-2 py-0.5 text-[9px] font-black uppercase ${inv.status === 'Rejected' || inv.status === 'NEEDS_CORRECTION'
-                                ? 'bg-red-50 text-red-600 border border-red-200'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              ? 'bg-red-50 text-red-600 border border-red-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
                               }`}
                           >
                             {inv.status || 'Pending'}
                           </span>
                         </td>
                         <td className="py-2.5 px-2.5 text-center">
-                          <button
-                            onClick={() => navigate(`/app/invoices/${inv._id}`)}
-                            className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-blue-600 hover:text-white transition"
-                          >
-                            View
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => navigate(`/app/invoice/${inv._id}`)}
+                              className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-blue-600 hover:text-white transition"
+                            >
+                              View
+                            </button>
+                            {(inv.status === 'Rejected' || inv.status === 'DUPLICATE_SUBMISSION' || inv.status === 'ALREADY_PAID') && (
+                              <button
+                                onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNumber)}
+                                className="rounded-lg bg-rose-50 border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-600 hover:text-white transition"
+                                title="Delete rejected invoice"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -647,13 +744,12 @@ export function FinanceDashboardView({
                     <th className="py-2 px-2.5">Vendor</th>
                     <th className="py-2 px-2.5 text-right">Amount</th>
                     <th className="py-2 px-2.5 text-center">Priority</th>
-                    <th className="py-2 px-2.5 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {paymentQueueList.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                      <td colSpan={4} className="py-8 text-center text-slate-400 font-medium">
                         No approved invoices currently waiting in payment queue.
                       </td>
                     </tr>
@@ -668,7 +764,12 @@ export function FinanceDashboardView({
                       return (
                         <tr key={inv._id} className="hover:bg-slate-50 transition">
                           <td className="py-2.5 px-2.5 font-mono font-bold text-blue-600">
-                            {inv.invoiceNumber || 'INV-000'}
+                            <button
+                              onClick={() => navigate(`/app/invoices/${inv._id}`)}
+                              className="hover:underline cursor-pointer text-left"
+                            >
+                              {inv.invoiceNumber || 'INV-000'}
+                            </button>
                           </td>
                           <td className="py-2.5 px-2.5 font-bold text-slate-900">
                             {inv.vendorName || 'Vendor'}
@@ -682,23 +783,6 @@ export function FinanceDashboardView({
                             >
                               {priorityText}
                             </span>
-                          </td>
-                          <td className="py-2.5 px-2.5 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => navigate(`/app/invoices/${inv._id}`)}
-                                className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-200 transition"
-                              >
-                                View
-                              </button>
-                              <button
-                                onClick={() => onMarkAsPaid && onMarkAsPaid(inv._id)}
-                                className="rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white hover:bg-emerald-700 transition flex items-center gap-1 shadow-xs"
-                              >
-                                <Check className="h-3 w-3 stroke-[3]" />
-                                Pay
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       )
@@ -720,45 +804,115 @@ export function FinanceDashboardView({
         </div>
       </div>
 
-      {/* 7. RECENT ACTIVITY TIMELINE */}
+      {/* 4. RECENT ACTIVITY TIMELINE */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-sm font-black text-slate-900">Your Recent Activity</h3>
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Live Event Stream</span>
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-blue-600" />
+            <h3 className="text-sm font-black text-slate-900">Your Recent Activity</h3>
+          </div>
+          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full uppercase">
+            Live Stream ({effectiveActivities.length} Events)
+          </span>
         </div>
 
-        <div className="mt-4 space-y-4">
-          {activityTimeline.length === 0 ? (
-            <p className="text-xs text-slate-400 font-medium py-4 text-center">
-              No recent activity recorded for your account yet.
-            </p>
-          ) : (
-            activityTimeline.slice(0, 6).map((log) => (
-              <div key={log._id} className="flex items-start gap-3 text-xs">
-                <div className="mt-0.5 rounded-full bg-blue-50 p-1.5 text-blue-600">
-                  <Activity className="h-3.5 w-3.5" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-slate-900">
+        <div className="mt-4 space-y-3.5">
+          {effectiveActivities.map((log) => (
+            <div key={log._id} className="flex items-start gap-3 text-xs p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition">
+              <div className="mt-0.5 rounded-xl bg-blue-100 p-2 text-blue-600 shrink-0">
+                <Activity className="h-3.5 w-3.5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-slate-900 truncate">
                     Invoice{' '}
                     <span className="font-mono text-blue-600">
                       {log.invoiceId?.invoiceNumber || 'INV-001'}
                     </span>{' '}
-                    — <span className="capitalize">{log.action || log.status}</span>
+                    — <span className="capitalize text-slate-700">{log.action || log.status}</span>
                   </p>
-                  <p className="text-[11px] text-slate-400">
-                    {log.comment || 'Action recorded in ledger'} •{' '}
+                  <span className="text-[10px] font-bold text-slate-400 shrink-0">
                     {new Date(log.timestamp || log.createdAt).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
-                  </p>
+                  </span>
                 </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                  {log.comment || 'Action recorded in ledger'}
+                </p>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* MARK AS PAID CONFIRMATION MODAL */}
+      {selectedInvoiceForPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-5 border border-emerald-100 animate-in fade-in zoom-in duration-200 text-left">
+            <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-600">
+                <CheckCircle2 className="h-5 w-5 stroke-[2.5]" />
+                <h3 className="text-base font-black text-slate-900">Mark Invoice as Paid?</h3>
+              </div>
+              <button
+                onClick={() => setSelectedInvoiceForPayment(null)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Invoice Overview */}
+            <div className="rounded-2xl bg-emerald-50/60 border border-emerald-200/80 p-4 space-y-2 text-xs">
+              <div className="flex justify-between font-medium text-slate-600">
+                <span>Vendor:</span>
+                <strong className="text-slate-900 font-bold">{selectedInvoiceForPayment.vendorName}</strong>
+              </div>
+              <div className="flex justify-between font-medium text-slate-600">
+                <span>Invoice Number:</span>
+                <span className="font-mono font-bold text-blue-600">#{selectedInvoiceForPayment.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between font-medium text-slate-600">
+                <span>Approved Amount:</span>
+                <strong className="text-emerald-700 font-black text-sm">
+                  {formatCurrency(selectedInvoiceForPayment.amount || selectedInvoiceForPayment.totalAmount, selectedInvoiceForPayment.currency)}
+                </strong>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 font-medium">
+              Are you sure the payment has been completed? This will mark the invoice as <strong className="text-emerald-700">PAID</strong>, create an audit entry, and move the invoice into the Paid Ledger.
+            </p>
+
+            {/* Modal Action Buttons */}
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setSelectedInvoiceForPayment(null)}
+                disabled={submittingPayment}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPaymentModal}
+                disabled={submittingPayment}
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50"
+              >
+                {submittingPayment ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
+                )}
+                <span>Confirm Payment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

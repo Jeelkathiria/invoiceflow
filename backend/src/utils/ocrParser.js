@@ -18,8 +18,6 @@ const DUE_DATE_REGEX = /(?:due\s*date|payment\s*due)[:.\s]*(\d{4}[-/.]\d{1,2}[-/
 const BUYER_NAME_REGEX = /(?:bill\s*to|billed\s*to|buyer|customer|consignee)[:.\s]*([^\n\r,]+)/i
 const BUYER_GSTIN_REGEX = /(?:buyer\s*gstin|customer\s*gstin|billed\s*to\s*gstin)[:.\s]*\b(\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1})\b/i
 
-// PO Number Patterns
-const PO_NUMBER_REGEX = /(?:po\s*(?:no|number|num|#)?|p\.o\.\s*(?:no|#)?|purchase\s*order\s*(?:no|#)?)[:.\s]*([a-z0-9\/-]+)/i
 
 // Payment Terms & Notes
 const PAYMENT_TERMS_REGEX = /(?:payment\s*terms|terms)[:.\s]*([^\n\r]+)/i
@@ -92,9 +90,6 @@ export function computeMissingFields(data = {}) {
   }
   if (!safeData.dueDate || String(safeData.dueDate).trim() === '' || safeData.dueDate === 'null' || safeData.dueDate === '-') {
     missingOptionalFields.push('Due Date')
-  }
-  if (!safeData.poNumber || String(safeData.poNumber).trim() === '') {
-    missingOptionalFields.push('Purchase Order Number')
   }
   if (!safeData.currency || String(safeData.currency).trim() === '') {
     missingOptionalFields.push('Currency')
@@ -172,11 +167,9 @@ export function parseHeaderFields(rawText = '', lines = []) {
   const vendorGstin = gstinMatch ? gstinMatch[0].toUpperCase() : ''
 
   // Invoice Number & PO Number
+  // Invoice Number
   const invMatch = text.match(INV_NUMBER_REGEX)
   const invoiceNumber = invMatch ? invMatch[1].trim() : null
-
-  const poMatch = text.match(PO_NUMBER_REGEX)
-  const poNumber = poMatch ? poMatch[1].trim() : ''
 
   // Dates
   const dateMatch = text.match(DATE_REGEX)
@@ -280,7 +273,6 @@ export function parseHeaderFields(rawText = '', lines = []) {
     buyerAddress: '',
     buyerEmail: '',
     invoiceNumber,
-    poNumber,
     invoiceDate,
     dueDate,
     paymentTerms,

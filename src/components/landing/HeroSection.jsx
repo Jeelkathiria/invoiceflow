@@ -103,8 +103,8 @@ export function HeroSection() {
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500">Purchase Order</p>
-                <p className="mt-1 text-sm font-mono font-bold text-slate-300">PO-99420</p>
+                <p className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500">Payment Terms</p>
+                <p className="mt-1 text-sm font-mono font-bold text-slate-300">Net 30 Days</p>
               </div>
               <div>
                 <p className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500">Approval Workflow</p>

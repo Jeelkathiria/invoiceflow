@@ -276,6 +276,8 @@ export function FinanceMemberDetails() {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#64748b', fontSize: 11 }}
+                    ticks={analyticsTab === 'count' ? [0, 5, 15, 25, 35] : undefined}
+                    domain={analyticsTab === 'count' ? [0, 35] : undefined}
                     tickFormatter={(val) =>
                       analyticsTab === 'value'
                         ? `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`

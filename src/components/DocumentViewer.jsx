@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, ExternalLink, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { FileText, ExternalLink, Download } from 'lucide-react'
 
 export function generateInvoiceSVG(invoice) {
   const invNumber = invoice?.invoiceNumber || invoice?.id || 'INV-2026-001'
@@ -105,7 +105,6 @@ export function generateInvoiceSVG(invoice) {
 
 export function DocumentViewer({ invoice, invoiceUrl, fileName, className = '' }) {
   const [loadError, setLoadError] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState(1.0)
 
   // Prioritize previewUrl (actual local file blob URL) or invoiceUrl
   const rawUrl = invoice?.previewUrl || invoiceUrl || invoice?.invoiceUrl || invoice?.fileUrl
@@ -113,20 +112,7 @@ export function DocumentViewer({ invoice, invoiceUrl, fileName, className = '' }
 
   useEffect(() => {
     setLoadError(false)
-    setZoomLevel(1.0)
   }, [rawUrl, invoice])
-
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 0.25, 2.5))
-  }
-
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 0.25, 0.75))
-  }
-
-  const handleResetZoom = () => {
-    setZoomLevel(1.0)
-  }
 
   const fallbackSvgUrl = generateInvoiceSVG(invoice)
 
@@ -141,61 +127,22 @@ export function DocumentViewer({ invoice, invoiceUrl, fileName, className = '' }
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* Viewer Container */}
+      {/* Viewer Container - Naturally Enlarged Original Photo View */}
       <div
-        className={`relative rounded-2xl border border-slate-700 bg-slate-900 ${
-          zoomLevel > 1.0 ? 'overflow-auto max-h-[420px]' : 'overflow-hidden min-h-[220px] max-h-[260px]'
-        } flex flex-col items-center justify-center p-2 shadow-inner group transition-all duration-200 select-none`}
+        className="relative rounded-2xl border border-slate-700/60 bg-slate-900 overflow-hidden flex flex-col items-center justify-center p-3 shadow-inner group transition-all duration-200 select-none min-h-[380px] max-h-[560px]"
       >
-        {/* Manual Zoom Controls Toolbar (No text saying "enlarged" or "scroll to enlarge") */}
-        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-xl bg-slate-950/80 p-1 text-slate-300 backdrop-blur-md border border-slate-700 shadow-md">
-          <button
-            onClick={handleZoomOut}
-            title="Zoom Out"
-            disabled={zoomLevel <= 0.75}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-white transition active:scale-95"
-          >
-            <ZoomOut className="h-3.5 w-3.5" />
-          </button>
-
-          <span className="px-1 text-[11px] font-bold text-slate-300 min-w-[38px] text-center">
-            {Math.round(zoomLevel * 100)}%
-          </span>
-
-          <button
-            onClick={handleZoomIn}
-            title="Zoom In"
-            disabled={zoomLevel >= 2.5}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-white transition active:scale-95"
-          >
-            <ZoomIn className="h-3.5 w-3.5" />
-          </button>
-
-          {zoomLevel !== 1.0 && (
-            <button
-              onClick={handleResetZoom}
-              title="Reset Zoom"
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition active:scale-95"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-
         {isPdfBlob && !loadError ? (
           <iframe
             src={effectiveUrl}
             title="PDF Document Preview"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-            className="w-full h-[240px] rounded-xl border-0 bg-white shadow-md transition-transform duration-200 ease-out"
+            className="w-full h-[520px] rounded-xl border-0 bg-white shadow-md"
             onError={() => setLoadError(true)}
           />
         ) : (
           <img
             src={effectiveUrl}
             alt="Original Invoice Document"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-            className="max-h-[230px] w-auto object-contain rounded-lg shadow-md transition-transform duration-200 ease-out"
+            className="max-h-[530px] w-full h-auto object-contain rounded-xl shadow-md transition-all duration-200"
             onError={() => setLoadError(true)}
           />
         )}

@@ -476,7 +476,7 @@ export function PaymentQueue() {
               <div className="flex justify-between font-medium text-slate-600">
                 <span>Approved Amount:</span>
                 <strong className="text-emerald-700 font-black text-sm">
-                  {formatCurrency(selectedInvoiceForPayment.amount, selectedInvoiceForPayment.currency)}
+                  {formatCurrency(selectedInvoiceForPayment.amount || selectedInvoiceForPayment.totalAmount || 0, selectedInvoiceForPayment.currency)}
                 </strong>
               </div>
               <div className="flex justify-between font-medium text-slate-600">

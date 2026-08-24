@@ -5,6 +5,7 @@ import { Signup } from '../pages/Signup'
 import { Dashboard } from '../pages/Dashboard'
 import { UploadInvoice } from '../pages/UploadInvoice'
 import { InvoiceDetails } from '../pages/InvoiceDetails'
+import { SentForApproval } from '../pages/SentForApproval'
 import { ApprovalQueue } from '../pages/ApprovalQueue'
 import { AllInvoices } from '../pages/AllInvoices'
 import { PaymentQueue } from '../pages/PaymentQueue'
@@ -67,12 +68,21 @@ export function AppRoutes() {
       >
         <Route index element={<Dashboard />} />
         
-        {/* Finance Restricted Route */}
+        {/* Finance Restricted Routes */}
         <Route
           path="upload"
           element={
             <RoleProtectedRoute allowedRoles={['finance']}>
               <UploadInvoice />
+            </RoleProtectedRoute>
+          }
+        />
+
+        <Route
+          path="sent-for-approval"
+          element={
+            <RoleProtectedRoute allowedRoles={['finance']}>
+              <SentForApproval />
             </RoleProtectedRoute>
           }
         />
@@ -126,6 +136,7 @@ export function AppRoutes() {
         />
         
         <Route path="invoices" element={<AllInvoices />} />
+        <Route path="invoices/:invoiceId" element={<InvoiceDetails />} />
         <Route path="invoice/:invoiceId" element={<InvoiceDetails />} />
         <Route path="profile" element={<Profile />} />
         <Route path="403" element={<Unauthorized />} />

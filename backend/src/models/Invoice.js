@@ -51,10 +51,6 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    poNumber: {
-      type: String,
-      default: '',
-    },
     paymentTerms: {
       type: String,
       default: 'Due on Receipt',
