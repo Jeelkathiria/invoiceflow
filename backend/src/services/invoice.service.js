@@ -291,14 +291,15 @@ export const saveInvoiceRecord = async (invoicePayload, userId) => {
 
   if (!isDup && invoiceData.vendorName && invoiceData.invoiceNumber) {
     try {
+      const currentId = String(invoicePayload.mongoId || invoicePayload._id || '')
       const dupRes = await checkDuplicateInvoice(
         invoiceData.vendorName,
         invoiceData.invoiceNumber,
-        invoiceData.amount
+        invoiceData.amount,
+        currentId || null
       )
       if (dupRes.isDuplicate) {
         const matchedId = String(dupRes.matchedInvoice?.id || '')
-        const currentId = String(invoicePayload.mongoId || invoicePayload._id || '')
         if (!currentId || matchedId !== currentId) {
           isDup = true
           matchedInv = dupRes.matchedInvoice

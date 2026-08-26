@@ -1,28 +1,74 @@
 import { Invoice } from '../models/Invoice.js'
 
-function escapeRegExp(string) {
-  return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/**
+ * Normalizes text by lowercasing, trimming, and stripping punctuation/symbols.
+ * Example: " Gujarat-Freight_Tools, Inc. " -> "gujaratfreighttoolsinc"
+ * Example: "INV-2026/001 #A" -> "inv2026001a"
+ */
+export function normalizeString(str) {
+  if (!str) return ''
+  return String(str)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]/g, '')
 }
 
 /**
- * Duplicate Detection Engine
- * Searches MongoDB for potential duplicate invoice entries based on:
- * Vendor Name + Invoice Number + Invoice Amount combination
+ * InvoiceFlow Duplicate Detection Engine
+ * 
+ * Rules:
+ * 1. Normalize Vendor Name and Invoice Number (lowercase, trim, strip punctuation/spaces).
+ * 2. Primary Duplicate Check: Matches normalized Vendor Name + normalized Invoice Number + Total Amount -> DUPLICATE
+ * 3. Secondary Check: Matches normalized Vendor Name + normalized Invoice Number (Amount differs) -> POTENTIAL_DUPLICATE
+ * 4. Otherwise -> NO_DUPLICATE
+ * 
+ * @param {string} vendorName - Vendor name from invoice
+ * @param {string} invoiceNumber - Invoice number from invoice
+ * @param {number} amount - Total amount from invoice
+ * @param {string|null} currentInvoiceId - Mongo ID of current invoice to exclude from duplicate search
  */
-export const checkDuplicateInvoice = async (vendorName, invoiceNumber, amount) => {
-  if (!vendorName || !invoiceNumber) return { isDuplicate: false, matchedInvoice: null }
+export const checkDuplicateInvoice = async (vendorName, invoiceNumber, amount, currentInvoiceId = null) => {
+  if (!vendorName || !invoiceNumber) {
+    return {
+      isDuplicate: false,
+      matchType: 'NO_DUPLICATE',
+      matchedInvoice: null,
+    }
+  }
 
   try {
-    const escapedVendor = escapeRegExp(vendorName.trim())
-    const escapedInvNum = String(invoiceNumber).trim()
+    const normVendor = normalizeString(vendorName)
+    const normInvNum = normalizeString(invoiceNumber)
+    const targetAmount = Number(amount) || 0
 
-    // Helper to format detailed match result
-    const formatMatchPayload = (doc) => {
-      const uploaderName = 'Finance Executive'
+    if (!normVendor || !normInvNum) {
+      return {
+        isDuplicate: false,
+        matchType: 'NO_DUPLICATE',
+        matchedInvoice: null,
+      }
+    }
+
+    // Build MongoDB query
+    const query = {}
+    if (currentInvoiceId) {
+      query._id = { $ne: currentInvoiceId }
+    }
+
+    // Fetch existing records from MongoDB database
+    const candidateInvoices = await Invoice.find(query)
+      .populate('uploadedBy', 'name email role')
+      .populate('approvedBy', 'name email role')
+      .populate('paidBy', 'name email role')
+      .sort({ createdAt: -1 })
+
+    // Helper to format match payload
+    const formatMatchPayload = (doc, matchType) => {
+      const uploaderName = doc.uploadedBy?.name || 'Finance Executive'
       const rawStatus = doc.status || 'Pending'
       const isPaid = rawStatus === 'Paid' || rawStatus === 'PAID'
       const isApproved = rawStatus === 'Approved' || rawStatus === 'APPROVED' || rawStatus === 'PAYMENT_QUEUE'
-      
+
       let statusResultLabel = 'ALREADY SUBMITTED & PENDING APPROVAL'
       if (isPaid) {
         statusResultLabel = 'WAS ALREADY PAID'
@@ -34,15 +80,19 @@ export const checkDuplicateInvoice = async (vendorName, invoiceNumber, amount) =
 
       const dateStr = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : ''
       const paidDateStr = doc.paidAt ? new Date(doc.paidAt).toLocaleDateString() : ''
+      const currencySym = doc.currency === 'USD' || doc.currency === '$' ? '$' : '₹'
 
-      let detailedReason = `Duplicate invoice detected. Original Invoice #${doc.invoiceNumber} for ${doc.vendorName} (${doc.currency || '₹'}${doc.amount || 0}) was submitted by ${uploaderName} on ${dateStr}.`
-      
-      if (isPaid) {
-        detailedReason = `This invoice WAS ALREADY PAID on ${paidDateStr || dateStr}. It was originally submitted by ${uploaderName}.`
-      } else if (isApproved) {
-        detailedReason = `This invoice WAS ALREADY APPROVED and is currently in the Payment Queue. It was originally submitted by ${uploaderName}.`
+      let detailedReason = ''
+      if (matchType === 'DUPLICATE') {
+        if (isPaid) {
+          detailedReason = `Exact Duplicate: Invoice #${doc.invoiceNumber} for ${doc.vendorName} (${currencySym}${doc.amount}) was ALREADY PAID on ${paidDateStr || dateStr} (Uploaded by ${uploaderName}).`
+        } else if (isApproved) {
+          detailedReason = `Exact Duplicate: Invoice #${doc.invoiceNumber} for ${doc.vendorName} (${currencySym}${doc.amount}) was ALREADY APPROVED and is in Payment Queue (Uploaded by ${uploaderName}).`
+        } else {
+          detailedReason = `Exact Duplicate: Invoice #${doc.invoiceNumber} for ${doc.vendorName} (${currencySym}${doc.amount}) was ALREADY SUBMITTED by ${uploaderName} on ${dateStr} (Status: ${rawStatus}).`
+        }
       } else {
-        detailedReason = `This invoice WAS ALREADY SUBMITTED by ${uploaderName} on ${dateStr} and is currently ${rawStatus}.`
+        detailedReason = `Potential Duplicate Warning: Invoice #${doc.invoiceNumber} from ${doc.vendorName} exists in database with a different amount (${currencySym}${doc.amount} existing vs ${currencySym}${targetAmount} new). Originally uploaded by ${uploaderName} on ${dateStr}.`
       }
 
       return {
@@ -57,48 +107,57 @@ export const checkDuplicateInvoice = async (vendorName, invoiceNumber, amount) =
         approvedBy: doc.approvedBy?.name || null,
         paidBy: doc.paidBy?.name || null,
         paidAt: doc.paidAt || null,
+        matchType,
         reason: detailedReason,
         createdAt: doc.createdAt,
       }
     }
 
-    // 1. Check exact combination match in MongoDB (Vendor + Inv Number + Amount)
-    let duplicateMatch = await Invoice.findOne({
-      vendorName: new RegExp(`^${escapedVendor}$`, 'i'),
-      invoiceNumber: escapedInvNum,
-      amount: Number(amount),
-    })
-      .populate('uploadedBy', 'name email role')
-      .populate('approvedBy', 'name email role')
-      .populate('paidBy', 'name email role')
+    // 1. PRIMARY CHECK: Match normalized Vendor + normalized Invoice Number + Total Amount -> DUPLICATE
+    const primaryMatch = candidateInvoices.find((doc) => {
+      const dbNormVendor = normalizeString(doc.vendorName)
+      const dbNormInvNum = normalizeString(doc.invoiceNumber)
+      const dbAmount = Number(doc.amount || doc.totalAmount || 0)
 
-    if (duplicateMatch) {
+      return dbNormVendor === normVendor && dbNormInvNum === normInvNum && dbAmount === targetAmount
+    })
+
+    if (primaryMatch) {
       return {
         isDuplicate: true,
-        matchedInvoice: formatMatchPayload(duplicateMatch),
+        matchType: 'DUPLICATE',
+        matchedInvoice: formatMatchPayload(primaryMatch, 'DUPLICATE'),
       }
     }
 
-    // 2. Fallback check for exact invoice number match from same vendor
-    duplicateMatch = await Invoice.findOne({
-      vendorName: new RegExp(`^${escapedVendor}$`, 'i'),
-      invoiceNumber: escapedInvNum,
-    })
-      .populate('uploadedBy', 'name email role')
-      .populate('approvedBy', 'name email role')
-      .populate('paidBy', 'name email role')
+    // 2. SECONDARY CHECK: Match normalized Vendor + normalized Invoice Number (Amount differs) -> POTENTIAL_DUPLICATE
+    const secondaryMatch = candidateInvoices.find((doc) => {
+      const dbNormVendor = normalizeString(doc.vendorName)
+      const dbNormInvNum = normalizeString(doc.invoiceNumber)
 
-    if (duplicateMatch) {
+      return dbNormVendor === normVendor && dbNormInvNum === normInvNum
+    })
+
+    if (secondaryMatch) {
       return {
         isDuplicate: true,
-        matchedInvoice: formatMatchPayload(duplicateMatch),
+        matchType: 'POTENTIAL_DUPLICATE',
+        matchedInvoice: formatMatchPayload(secondaryMatch, 'POTENTIAL_DUPLICATE'),
       }
     }
 
-    return { isDuplicate: false, matchedInvoice: null }
+    // 3. NO MATCH
+    return {
+      isDuplicate: false,
+      matchType: 'NO_DUPLICATE',
+      matchedInvoice: null,
+    }
   } catch (error) {
     console.error('[Duplicate Checker Error]:', error.message)
-    return { isDuplicate: false, matchedInvoice: null }
+    return {
+      isDuplicate: false,
+      matchType: 'NO_DUPLICATE',
+      matchedInvoice: null,
+    }
   }
 }
-
