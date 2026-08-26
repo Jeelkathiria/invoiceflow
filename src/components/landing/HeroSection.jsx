@@ -39,26 +39,19 @@ export function HeroSection() {
             Automate accounts payable with hybrid Tesseract OCR + Gemini 2.5 Vision field extraction, real-time duplicate risk detection, dual currency tracking (₹ & $), and role-isolated manager signoffs.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3.5 pt-2">
-            <a
-              href="/login?auto=manager"
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3.5 text-sm font-extrabold text-white shadow-xl shadow-blue-600/30 transition hover:bg-blue-500 hover:scale-[1.02] active:scale-95"
-            >
-              <Sparkles className="h-4 w-4 text-blue-200 fill-current" />
-              <span>Login as Manager</span>
-            </a>
+          <div className="flex flex-wrap items-center gap-4 pt-2">
             <a
               href="/signup"
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-6 py-3.5 text-sm font-bold text-slate-200 backdrop-blur-md transition hover:border-slate-700 hover:text-white active:scale-95 shadow-lg"
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-blue-600/30 transition hover:bg-blue-500 hover:scale-[1.02] active:scale-95"
             >
               <span>Get Started Free</span>
               <ArrowRight className="h-4 w-4 stroke-[2.5]" />
             </a>
             <button
               onClick={() => setIsVideoModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-5 py-3.5 text-sm font-bold text-slate-300 backdrop-blur-md transition hover:border-slate-700 hover:text-white active:scale-95 cursor-pointer shadow-lg hover:shadow-blue-500/10"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-6 py-3.5 text-sm font-bold text-slate-200 backdrop-blur-md transition hover:border-slate-700 hover:text-white active:scale-95 cursor-pointer shadow-lg hover:shadow-blue-500/10"
             >
-              <Play className="h-4 w-4 fill-current text-blue-400" /> Live Demo
+              <Play className="h-4 w-4 fill-current text-blue-400" /> Live Platform Demo
             </button>
           </div>
 
