@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, Play, Sparkles, ShieldCheck, FileCheck, Zap, Bot, Layers, X } from 'lucide-react'
+import { DemoVideoPlayer } from './DemoVideoPlayer'
 
 export function HeroSection() {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
@@ -48,7 +49,7 @@ export function HeroSection() {
             </a>
             <button
               onClick={() => setIsVideoModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-6 py-3.5 text-sm font-bold text-slate-200 backdrop-blur-md transition hover:border-slate-700 hover:text-white active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-6 py-3.5 text-sm font-bold text-slate-200 backdrop-blur-md transition hover:border-slate-700 hover:text-white active:scale-95 cursor-pointer shadow-lg hover:shadow-blue-500/10"
             >
               <Play className="h-4 w-4 fill-current text-blue-400" /> Live Platform Demo
             </button>
@@ -160,7 +161,7 @@ export function HeroSection() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-white">InvoiceFlow Platform Walkthrough</h3>
-                    <p className="text-xs font-mono text-slate-400">Live 20-Second Feature Recording</p>
+                    <p className="text-xs font-mono text-slate-400">Live 20-Second Interactive Feature Reel</p>
                   </div>
                 </div>
 
@@ -173,35 +174,8 @@ export function HeroSection() {
               </div>
 
               {/* Video Player Box */}
-              <div className="relative aspect-video w-full bg-slate-950">
-                <img
-                  src="/demo-video.webp"
-                  alt="InvoiceFlow Platform Live Walkthrough Demo"
-                  className="h-full w-full object-contain"
-                />
-              </div>
-
-              {/* Footer */}
-              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 bg-slate-950/50 px-6 py-4">
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                  <Sparkles className="h-4 w-4 text-blue-400" /> Featuring Gemini AI extraction, Manager approvals & Payment Queue
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setIsVideoModalOpen(false)}
-                    className="rounded-xl px-4 py-2 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
-                  >
-                    Close Demo
-                  </button>
-                  <a
-                    href="/login"
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition"
-                  >
-                    <span>Launch Live Platform</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </a>
-                </div>
+              <div className="p-4 sm:p-6 bg-slate-950">
+                <DemoVideoPlayer onClose={() => setIsVideoModalOpen(false)} />
               </div>
             </motion.div>
           </div>
