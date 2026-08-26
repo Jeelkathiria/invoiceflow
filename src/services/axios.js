@@ -18,7 +18,17 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error),
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear stale authentication session on 401 Unauthorized
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      if (window.location.pathname.startsWith('/app')) {
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  },
 )
 
 export default api

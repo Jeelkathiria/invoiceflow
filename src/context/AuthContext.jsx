@@ -52,23 +52,10 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       console.warn('[AuthContext]: Login API error:', err.response?.data?.message || err.message)
-      
-      if (err.response) {
-        return {
-          success: false,
-          error: err.response.data?.message || 'Invalid email or password',
-        }
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Invalid email or password. Only registered accounts can log in.',
       }
-
-      // Offline fallback only if server is unreachable
-      const normalizedRole = values.role ? values.role.toLowerCase() : (values.email?.includes('manager') ? 'manager' : 'finance')
-      const fallbackUser = {
-        name: values.fullName || values.name || (normalizedRole === 'manager' ? 'Finance Manager' : 'Finance Executive'),
-        email: values.email || 'finance@invoiceflow.com',
-        role: normalizedRole,
-      }
-      setUser(fallbackUser)
-      return { success: true, user: fallbackUser }
     }
   }
 
@@ -93,23 +80,10 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       console.warn('[AuthContext]: Signup API error:', err.response?.data?.message || err.message)
-      
-      if (err.response) {
-        return {
-          success: false,
-          error: err.response.data?.message || 'Registration failed. Please check your inputs.',
-        }
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Registration failed. An account with this email may already exist.',
       }
-
-      // Offline fallback only if server is unreachable
-      const normalizedRole = (values.role || 'finance').toLowerCase()
-      const fallbackUser = {
-        name: values.fullName || values.name || 'Finance Executive',
-        email: values.email,
-        role: normalizedRole,
-      }
-      setUser(fallbackUser)
-      return { success: true, user: fallbackUser }
     }
   }
 
