@@ -34,81 +34,6 @@ import {
 import api from '../services/axios'
 import { formatCurrency } from '../utils/formatCurrency'
 
-function getFallbackMemberData(userId) {
-  return {
-    user: {
-      _id: userId || 'demo-user-1',
-      name: 'Alex Johnson',
-      email: 'alex.johnson@invoiceflow.com',
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId || 'Alex'}`,
-      role: 'Finance',
-      createdAt: '2026-01-15T00:00:00.000Z',
-    },
-    stats: {
-      totalInvoices: 18,
-      pending: 3,
-      approved: 8,
-      rejected: 1,
-      paymentQueue: 4,
-      paid: 2,
-      totalValue: 540000,
-    },
-    paymentSummary: {
-      paymentQueueValue: 120000,
-      dueSoonAmount: 45000,
-      overdueAmount: 15000,
-      paidThisMonthAmount: 95000,
-    },
-    monthlyAnalytics: [
-      { month: 'Jan', value: 85000, count: 3 },
-      { month: 'Feb', value: 140000, count: 5 },
-      { month: 'Mar', value: 95000, count: 4 },
-      { month: 'Apr', value: 220000, count: 6 },
-    ],
-    statusDistribution: {
-      items: [
-        { name: 'Pending Approval', count: 3, color: '#f59e0b' },
-        { name: 'Approved', count: 8, color: '#10b981' },
-        { name: 'Rejected', count: 1, color: '#ef4444' },
-        { name: 'Payment Queue', count: 4, color: '#2563eb' },
-        { name: 'Paid', count: 2, color: '#059669' },
-      ],
-      totalCount: 18,
-    },
-    recentInvoices: [
-      {
-        _id: 'inv-demo-1',
-        invoiceNumber: 'INV-2026-0042',
-        vendorName: 'Acme Cloud Solutions',
-        amount: 85000,
-        currency: 'INR',
-        status: 'Pending',
-        invoiceDate: '2026-02-14',
-        dueDate: '2026-03-15',
-      },
-      {
-        _id: 'inv-demo-2',
-        invoiceNumber: 'INV-2026-0039',
-        vendorName: 'Global Tech Systems',
-        amount: 145000,
-        currency: 'INR',
-        status: 'Approved',
-        invoiceDate: '2026-02-10',
-        dueDate: '2026-03-10',
-      },
-    ],
-    recentActivity: [
-      {
-        _id: 'act-1',
-        action: 'uploaded invoice',
-        invoiceId: { invoiceNumber: 'INV-2026-0042' },
-        comment: 'Awaiting manager signoff',
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  }
-}
-
 export function FinanceMemberDetails() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -126,11 +51,11 @@ export function FinanceMemberDetails() {
         if (res.data && res.data.data) {
           setData(res.data.data)
         } else {
-          setData(getFallbackMemberData(userId))
+          setError('Member details could not be found.')
         }
       } catch (err) {
-        console.warn('Using fallback member details:', err.message)
-        setData(getFallbackMemberData(userId))
+        console.error('Failed to fetch finance member details:', err)
+        setError(err.response?.data?.message || 'Failed to load member details.')
       } finally {
         setLoading(false)
       }
