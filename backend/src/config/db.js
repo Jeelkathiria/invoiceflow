@@ -30,8 +30,12 @@ export const seedDefaultUsers = async () => {
 }
 
 export const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection
+  }
+
+  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/invoiceflow'
   try {
-    const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/invoiceflow'
     const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 5000,
     })
@@ -42,6 +46,7 @@ export const connectDB = async () => {
 
     return conn
   } catch (error) {
-    console.warn(`[MongoDB Warning]: Could not connect to MongoDB (${error.message}).`)
+    console.error(`[MongoDB Warning]: Could not connect to MongoDB (${error.message}).`)
+    throw error
   }
 }
