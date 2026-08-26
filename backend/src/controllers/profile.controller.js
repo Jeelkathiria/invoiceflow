@@ -39,6 +39,10 @@ export const updatePassword = async (req, res, next) => {
       return errorResponse(res, 400, 'Please provide both current and new password')
     }
 
+    if (currentPassword === newPassword) {
+      return errorResponse(res, 400, 'New password cannot be the same as current password')
+    }
+
     const user = await User.findById(req.user._id)
     const isMatch = await user.comparePassword(currentPassword)
     if (!isMatch) {

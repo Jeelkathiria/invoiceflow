@@ -88,6 +88,10 @@ export function Profile() {
       setPasswordError('Please enter a new password')
       return
     }
+    if (passwords.oldPassword === passwords.newPassword) {
+      setPasswordError('New password cannot be the same as current password')
+      return
+    }
     if (passwords.newPassword.length < 6) {
       setPasswordError('New password must be at least 6 characters long')
       return

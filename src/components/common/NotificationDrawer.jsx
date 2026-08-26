@@ -53,6 +53,8 @@ export function NotificationDrawer({ isOpen, onClose }) {
       setUnreadCount(0)
     } catch (err) {
       console.error('Failed to mark all as read:', err)
+    } finally {
+      onClose()
     }
   }
 

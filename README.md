@@ -1,44 +1,42 @@
-# InvoiceFlow - AI-Powered Invoice Lifecycle Engine
+# InvoiceFlow — AI-Powered Enterprise Invoice & Accounts Payable Platform
 
-InvoiceFlow automates invoice processing, extraction, validation, duplicate detection, and manager approval workflows for accounts payable operations.
-
-## Overview
-
-InvoiceFlow is an enterprise SaaS platform built to automate the accounts payable lifecycle. Powered by Google Gemini AI Multimodal Vision, MongoDB, and Role-Based Access Control (RBAC), InvoiceFlow transforms manual invoice entry into an automated, audit-ready workflow.
+**InvoiceFlow** is an enterprise-grade accounts payable automation platform designed to streamline invoice ingestion, AI extraction, duplicate risk detection, multi-tier manager approvals, and payment queue execution.
 
 ---
 
-## Key Capabilities
+## 🌟 Key Features & Capabilities
 
-### 1. AI Multimodal Document Extraction
-- Parses unstructured PDF documents, PNGs, and JPEGs using Google Gemini AI.
-- Extracts vendor details, GSTIN, invoice numbers, invoice dates, due dates, subtotal, GST tax calculations, discounts, payment terms, and itemized line items.
-- Built-in fallback heuristics handle high API traffic without service interruptions.
+### 1. AI Multimodal Document Extraction (Gemini + OCR Pipeline)
+- **Google Gemini Multimodal Vision**: Extracts structured data from PDF documents, PNG, and JPEG files using `@google/genai`.
+- **Automatic Fallback OCR**: Integrated Tesseract OCR fallback engine ensures high availability during AI service congestion.
+- **Comprehensive Field Ingestion**: Automatically extracts Vendor Details, GSTIN/Tax ID, Invoice Number, Issue & Due Dates, Payment Terms, Subtotal, GST/Tax, Discounts, Line Items, and Total Amounts.
 
 ### 2. Cross-User Duplicate Risk Engine
-- Cross-checks vendor name, invoice number, and total amounts against all persisted invoices in MongoDB.
-- Flags duplicate risk with real-time audit details:
-  - Uploader Name: Identifies the Finance Executive who previously submitted the invoice.
-  - Approval Status: Indicates whether the matching invoice is Pending or Already Approved.
-- Automatically cleans up unsubmitted draft invoices when files are discarded.
+- **Pre-Flight Duplicate Detection**: Scans database records before submission to prevent double-payments and duplicate entries.
+- **Audit Context**: Highlights uploader identity, existing approval status (e.g., Pending, Approved, Paid), and direct references to original invoice records.
 
-### 3. Enterprise Role-Based Access Control (RBAC)
-- Finance Executive Role: Upload documents, inspect OCR outputs, edit line items, manage draft cleanup, and submit verified invoices for approval.
-- Manager Role: Review approval queue, inspect original PDF documents side-by-side with line items, approve/reject with remarks, and monitor company-wide metrics.
+### 3. Role-Based Access Control (RBAC) Workflows
 
-### 4. Real-Time Analytics Dashboard
-- Interactive financial charts built with SVG visualizations:
-  - Monthly expense trend curves.
-  - Spend distribution by category (Software, Hardware, Consulting, Office Supplies).
-  - Quick action widgets for upcoming payments and recent uploads.
+| Role | Core Responsibilities & Workflow |
+| :--- | :--- |
+| **Finance Executive** | Upload invoices, inspect AI extraction, edit line items, handle correction requests, submit to Manager Queue, and execute final payment disbursements. |
+| **Manager** | Review approval queue, perform side-by-side PDF document review, approve invoices, or send for correction/reject with structured modal notes and reference linking. |
 
-### 5. Audit Trail & Ledger Management
-- Complete action history recording upload, edit, submission, approval, and rejection events with user timestamps.
-- Master Ledger with filtering, status tags, and pagination.
+### 4. Interactive Rejection & Correction Workflows
+- **Structured Rejection Reasons**: Select specific rejection types (`CORRECTION_REQUIRED`, `ALREADY_SUBMITTED`, `ALREADY_PAID`).
+- **Correction Queue**: Allows Finance Executives to fix flagged items ("Fix & Resubmit") and send updated revisions back into the approval pipeline.
+
+### 5. Global Context Search & Real-Time Notifications
+- **Global Search Palette**: Instantly search invoices by invoice number, vendor, amount, or status with context-aware navigation.
+- **Notification Center**: Operational drawer for real-time workflow alerts with single-click **Read All** auto-dismiss.
+
+### 6. Analytics & Financial Ledger
+- **Expense Analytics**: Spend distribution curves, category breakdowns, and monthly financial metrics.
+- **Master Ledger & Audit Trail**: Full status tracking, payment history logs, pagination, and export capabilities.
 
 ---
 
-## System Architecture
+## 🏗️ System Architecture
 
 ```
                                ┌──────────────────────────┐
@@ -63,64 +61,28 @@ InvoiceFlow is an enterprise SaaS platform built to automate the accounts payabl
 
 ---
 
-## End-to-End Invoice Lifecycle Workflow
+## ⚙️ Tech Stack
 
-```
-[ Upload PDF / Image Invoice ] 
-       │
-       ▼
-[ Gemini AI OCR Extraction ] 
-       │
-       ▼
-[ Finance Executive Verification & Line Item Edits ] 
-       │
-       ▼
-[ Duplicate Risk Engine Check ]
-       │
-  ┌────┴─────────────────────────────┐
-  │                                  │
-  ▼ (Duplicate Found)                ▼ (No Duplicate)
-[ Flag Risk Banner & Uploader ]    [ Submit to Manager Approval Queue ]
-  │                                  │
-  └──────────────────┬───────────────┘
-                     ▼
-       [ Manager Side-by-Side Review ]
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
-   [ Approved ]             [ Rejected ]
-         │                       │
-         └───────────┬───────────┘
-                     ▼
-   [ Analytics Dashboard & Audit Trail ]
-```
+- **Frontend**: React 19, Vite 7, Tailwind CSS, Lucide React, Axios
+- **Backend**: Node.js, Express.js, JWT Authentication, Express Validator
+- **Database**: MongoDB, Mongoose ORM
+- **AI Services**: Google Gemini Multimodal Vision API (`@google/genai`)
+- **Cloud Media**: Cloudinary CDN / Base64 Document Storage
 
 ---
 
-## Tech Stack
-
-| Domain | Technology / Library |
-| :--- | :--- |
-| Frontend | React 19, Vite 7, Tailwind CSS, Lucide React, Framer Motion, Axios |
-| Backend | Node.js, Express.js, JSON Web Tokens (JWT), Bcrypt, Express Validator |
-| Database | MongoDB, Mongoose ORM |
-| AI Service | Google Gemini AI Vision (`@google/genai`) |
-| Cloud Storage | Cloudinary CDN |
-
----
-
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js: v18.x or higher
-- MongoDB: Local instance or MongoDB Atlas URI
-- Google Gemini API Key: From Google AI Studio
+- **Node.js**: v18.x or higher
+- **MongoDB**: Local MongoDB instance or MongoDB Atlas Connection String
+- **Google Gemini API Key**: From [Google AI Studio](https://aistudio.google.com/)
 
 ---
 
 ### Environment Setup
 
-#### Backend Configuration (`backend/.env`)
+#### 1. Backend Environment (`backend/.env`)
 ```env
 PORT=5001
 MONGO_URI=mongodb://localhost:27017/invoiceflow
@@ -128,7 +90,7 @@ JWT_SECRET=your_super_secret_jwt_key
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-#### Frontend Configuration (`.env`)
+#### 2. Frontend Environment (`.env`)
 ```env
 VITE_API_URL=http://localhost:5001/api
 ```
@@ -149,37 +111,34 @@ cd backend
 npm install
 npm run server
 ```
-Backend server runs on `http://localhost:5001`
+*Backend runs on `http://localhost:5001`*
 
-#### 3. Start Frontend Client
+#### 3. Start Frontend Application
 ```bash
-# In project root
+# In the project root directory
 npm install
 npm run dev
 ```
-Frontend client runs on `http://localhost:5173`
+*Frontend application runs on `http://localhost:5173`*
 
 ---
 
-## Account Registration & User Credentials
+## 🔐 Credentials & Quick Access
 
-- Finance Executive Role: Finance Executives register their own workspace account via the Public Signup Page (`/signup`). Any new user who registers on the platform receives a Finance Executive role to upload invoices, edit line items, and submit bills for approval.
-- Manager Role: Manager accounts use the fixed demo credentials (`Manager@gmail.com` / `Manager`) to access the Manager Approval Queue, review original invoice PDFs side-by-side, and approve or reject submissions with remarks.
-
-| Role | Registration / Credentials | Access Rights |
-| :--- | :--- | :--- |
-| Finance Executive | Register on `/signup` or use Quick Demo Access | Upload Invoices, Inspect OCR, Edit Line Items, Draft Cleanup, Submit to Manager |
-| Manager | `Manager@gmail.com` / `Manager` | View Approval Queue, Side-by-Side PDF Review, Approve/Reject, Analytics |
+- **Finance Executive**: Register via `/signup` or use Quick Demo Login.
+- **Manager Account**:
+  - **Email**: `Manager@gmail.com`
+  - **Password**: `Manager`
 
 ---
 
-## Repository
+## 📁 Repository & Maintainer
 
-- GitHub Repository: https://github.com/Jeelkathiria/invoiceflow
-- Developer: Jeel Kathiria
+- **GitHub Repository**: [InvoiceFlow Repo](https://github.com/Jeelkathiria/invoiceflow)
+- **Developer**: Jeel Kathiria
 
 ---
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License.

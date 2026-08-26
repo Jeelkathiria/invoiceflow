@@ -49,7 +49,6 @@ export function InvoiceDetails() {
   const [invoice, setInvoice] = useState(null)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('Pending')
-  const [managerComment, setManagerComment] = useState('')
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -384,7 +383,7 @@ export function InvoiceDetails() {
       if (invoice._id) {
         await api.put(`/invoices/${invoice._id}`, {
           status: newStatus,
-          comments: comment ? [comment] : managerComment ? [managerComment] : [],
+          comments: comment ? [comment] : [],
         })
       }
       setStatus(newStatus)
@@ -568,9 +567,9 @@ export function InvoiceDetails() {
           {isFinance && (status === 'NEEDS_CORRECTION' || status === 'Needs Correction') && isOwner && !isEditing && (
             <button
               onClick={startEditing}
-              className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-amber-700 cursor-pointer animate-pulse"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-slate-800 active:scale-95 cursor-pointer"
             >
-              <Edit3 className="h-4 w-4" />
+              <Edit3 className="h-3.5 w-3.5 text-amber-400" />
               <span>Fix & Resubmit</span>
             </button>
           )}
@@ -726,26 +725,14 @@ export function InvoiceDetails() {
       {/* 1. CORRECTION REQUIRED BANNER */}
       {(status === 'NEEDS_CORRECTION' || status === 'Rejected') && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-5 shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/80 pb-3">
-            <div className="flex items-center gap-2.5 text-amber-900 font-extrabold text-sm">
-              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-              <div>
-                <span>INVOICE REJECTED — CORRECTION REQUIRED</span>
-                <p className="text-[11px] font-normal text-amber-800">
-                  Review rejection notes below. Finance user can edit values and resubmit for approval.
-                </p>
-              </div>
+          <div className="flex items-center gap-2.5 text-amber-900 font-extrabold text-sm border-b border-amber-200/80 pb-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <span>INVOICE REJECTED — CORRECTION REQUIRED</span>
+              <p className="text-[11px] font-normal text-amber-800">
+                Review rejection notes below. Click 'Fix & Resubmit' above to edit values and resubmit for approval.
+              </p>
             </div>
-
-            {isFinance && isOwner && !isEditing && (
-              <button
-                onClick={startEditing}
-                className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 cursor-pointer shrink-0"
-              >
-                <Edit3 className="h-4 w-4" />
-                <span>Fix & Resubmit</span>
-              </button>
-            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 text-xs text-amber-950">
@@ -1406,29 +1393,10 @@ export function InvoiceDetails() {
           </div>
         </div>
 
-        {/* RIGHT SIDE (5 COLS): Original Source Document & Manager Comment Box */}
+        {/* RIGHT SIDE (5 COLS): Original Source Document */}
         <div className="lg:col-span-5 space-y-6">
           <div className="sticky top-6 space-y-6">
             
-            {/* MANAGER COMMENT BOX (IF MANAGER & PENDING) */}
-            {isManager && status === 'Pending' && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 space-y-2.5 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-blue-600" />
-                  <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
-                    Manager Review Note / Rejection Reason
-                  </h3>
-                </div>
-                <textarea
-                  value={managerComment}
-                  onChange={(e) => setManagerComment(e.target.value)}
-                  placeholder="Type approval note or reason for rejection here..."
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition placeholder:text-slate-400 font-medium"
-                />
-              </div>
-            )}
-
             {/* DOCUMENT PREVIEW CARD */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
