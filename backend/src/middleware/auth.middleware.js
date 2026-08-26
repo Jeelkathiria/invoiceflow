@@ -15,6 +15,42 @@ export const protect = async (req, res, next) => {
     return errorResponse(res, 401, 'Not authorized, token missing')
   }
 
+  // Handle Demo Tokens for seamless demo access
+  if (token === 'demo-manager-jwt-token' || token.includes('demo-manager')) {
+    let demoUser = await User.findOne({ role: 'manager' })
+    if (!demoUser) {
+      demoUser = await User.findOne({ email: 'manager@gmail.com' })
+    }
+    if (demoUser) {
+      req.user = demoUser
+      return next()
+    } else {
+      req.user = {
+        _id: '650000000000000000000001',
+        name: 'Finance Manager',
+        email: 'manager@gmail.com',
+        role: 'manager',
+      }
+      return next()
+    }
+  }
+
+  if (token === 'demo-finance-jwt-token' || token.includes('demo-finance')) {
+    let demoUser = await User.findOne({ role: 'finance' })
+    if (demoUser) {
+      req.user = demoUser
+      return next()
+    } else {
+      req.user = {
+        _id: '650000000000000000000002',
+        name: 'Finance Executive',
+        email: 'finance@gmail.com',
+        role: 'finance',
+      }
+      return next()
+    }
+  }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_jwt_key_invoiceflow_2026_prod')
     const user = await User.findById(decoded.id).select('-password')
