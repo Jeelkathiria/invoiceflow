@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Mail, Lock, CheckCircle2, Loader2, AlertCircle, Sparkles } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 export function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [errorMessage, setErrorMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { register, handleSubmit, setValue, watch } = useForm({
@@ -19,28 +20,7 @@ export function Login() {
   const emailValue = watch('email')
   const passwordValue = watch('password')
 
-  const onSubmit = async (values) => {
-    setErrorMessage('')
-    setIsLoading(true)
-    try {
-      const res = await login({
-        email: values.email,
-        password: values.password,
-      })
-
-      if (res.success) {
-        navigate('/app')
-      } else {
-        setErrorMessage(res.error || 'Invalid credentials')
-      }
-    } catch (err) {
-      setErrorMessage('An unexpected error occurred. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleManagerDemoLogin = async () => {
+  const handleManagerDemoLogin = useCallback(async () => {
     setErrorMessage('')
     setIsLoading(true)
     const demoEmail = 'Manager@gmail.com'
@@ -58,12 +38,41 @@ export function Login() {
       })
 
       if (res.success) {
-        navigate('/app')
+        navigate('/app', { replace: true })
       } else {
         setErrorMessage(res.error || 'Demo login failed')
       }
     } catch (err) {
       setErrorMessage('Demo login failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [login, navigate, setValue])
+
+  useEffect(() => {
+    const auto = searchParams.get('auto')
+    const role = searchParams.get('role')
+    if (auto === 'manager' || role === 'manager' || auto === 'true') {
+      handleManagerDemoLogin()
+    }
+  }, [searchParams, handleManagerDemoLogin])
+
+  const onSubmit = async (values) => {
+    setErrorMessage('')
+    setIsLoading(true)
+    try {
+      const res = await login({
+        email: values.email,
+        password: values.password,
+      })
+
+      if (res.success) {
+        navigate('/app', { replace: true })
+      } else {
+        setErrorMessage(res.error || 'Invalid credentials')
+      }
+    } catch (err) {
+      setErrorMessage('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }

@@ -38,25 +38,31 @@ export function Navbar() {
         </nav>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <a
             href="https://github.com/Jeelkathiria/invoiceflow"
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-slate-300 hover:border-blue-500 hover:text-white transition"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-slate-300 hover:border-blue-500 hover:text-white transition"
           >
             <Github className="h-3.5 w-3.5" />
             <span>GitHub</span>
           </a>
           <Link
-            className="rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-bold text-slate-200 transition hover:border-slate-700 hover:text-white"
+            className="rounded-full border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-slate-200 transition hover:border-slate-700 hover:text-white"
             to="/login"
           >
             Login
           </Link>
           <Link
+            className="rounded-full border border-blue-500/40 bg-blue-500/10 px-3.5 py-1.5 text-xs font-extrabold text-blue-400 transition hover:bg-blue-600 hover:text-white"
+            to="/login?auto=manager"
+          >
+            Login as Manager
+          </Link>
+          <Link
             to="/signup"
-            className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 px-5.5 py-2 text-xs font-extrabold text-white shadow-lg shadow-blue-600/30 transition-all duration-300 hover:shadow-blue-500/50 hover:scale-[1.03] active:scale-95 border border-blue-400/30"
+            className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 px-4 py-1.5 text-xs font-extrabold text-white shadow-lg shadow-blue-600/30 transition-all duration-300 hover:shadow-blue-500/50 hover:scale-[1.03] active:scale-95 border border-blue-400/30"
           >
             <span>Get Started</span>
             <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
