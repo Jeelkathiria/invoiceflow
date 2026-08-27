@@ -37,9 +37,10 @@ export const runOCR = async (fileBuffer, mimeType = 'image/png') => {
   let worker = null
 
   try {
-    // 1. Check if document is PDF or non-standard file
-    if (!mimeType || mimeType === 'application/pdf' || !isValidImageBuffer(fileBuffer)) {
-      console.log(`[OCR Service]: Document is non-raster image or PDF. Gracefully routing to Gemini Vision fallback.`)
+    // 1. Check if document is PDF, non-standard file, or running in Vercel serverless environment
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+    if (isServerless || !mimeType || mimeType === 'application/pdf' || !isValidImageBuffer(fileBuffer)) {
+      console.log(`[OCR Service]: Document is PDF, non-raster, or running on Vercel serverless (${isServerless ? 'Serverless Vercel' : mimeType}). Routing directly to Gemini Vision AI.`)
       return {
         rawText: '',
         ocrConfidence: 0,

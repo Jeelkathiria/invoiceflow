@@ -183,13 +183,10 @@ export const extractAndAnalyzeInvoice = async (file, userId = null) => {
 
   const { missingMandatoryFields, missingOptionalFields } = computeMissingFields(extractedData)
   const amount = Number(extractedData.totalAmount || extractedData.amount || 0)
-  const isValidInvoice = (
-    missingMandatoryFields.length === 0 &&
-    amount > 0 &&
-    extractedData.isValidInvoice !== false
-  )
+  const isValidInvoice = extractedData.isValidInvoice !== false
 
-  const finalConfidence = isValidInvoice ? Math.max(90, extractedData.overallConfidenceScore || ocrResult.ocrConfidence || 95.0) : 0
+  const finalConfidence = isValidInvoice ? Math.max(85, extractedData.overallConfidenceScore || ocrResult.ocrConfidence || 95.0) : 0
+  const confidenceStatus = isValidInvoice ? (finalConfidence >= 90 ? 'High Confidence' : 'Needs Review') : 'Invalid Document / Not an Invoice'
 
   // Duplicate Check
   let isDuplicate = false

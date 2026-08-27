@@ -1,13 +1,24 @@
 import { Notification } from '../models/Notification.js'
 import { successResponse, errorResponse } from '../utils/apiResponse.js'
 
+const handleControllerError = (err, res, next) => {
+  if (typeof next === 'function') {
+    try {
+      return next(err)
+    } catch (e) {}
+  }
+  console.error('[Notification Controller Error]:', err)
+  const statusCode = err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500)
+  const message = err.message || 'Notification operation failed'
+  return errorResponse(res, statusCode, message)
+}
+
 // Get all notifications for user/role
 export const getNotifications = async (req, res, next) => {
   try {
     const userRole = (req.user?.role || 'finance').toLowerCase()
     const userId = req.user?._id
 
-    // Fetch notifications targeting the user or user's role or 'all'
     const query = {
       $or: [
         { recipientRole: 'all' },
@@ -24,11 +35,11 @@ export const getNotifications = async (req, res, next) => {
       unreadCount,
     })
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
-// Mark single notification as read (Deletes from MongoDB once seen)
+// Mark single notification as read
 export const markAsRead = async (req, res, next) => {
   try {
     const { id } = req.params
@@ -40,11 +51,11 @@ export const markAsRead = async (req, res, next) => {
 
     return successResponse(res, 200, 'Notification seen and removed', { id })
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
-// Mark all notifications as read (Deletes all notifications for user/role once seen)
+// Mark all notifications as read
 export const markAllAsRead = async (req, res, next) => {
   try {
     const userRole = (req.user?.role || 'finance').toLowerCase()
@@ -62,7 +73,7 @@ export const markAllAsRead = async (req, res, next) => {
 
     return successResponse(res, 200, 'All notifications seen and removed')
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -73,7 +84,7 @@ export const deleteNotification = async (req, res, next) => {
     await Notification.findByIdAndDelete(id)
     return successResponse(res, 200, 'Notification deleted successfully')
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -83,6 +94,6 @@ export const clearAllNotifications = async (req, res, next) => {
     await Notification.deleteMany({})
     return successResponse(res, 200, 'All notifications cleared')
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }

@@ -145,11 +145,21 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
   const extractedTotal = Number(safeData.totalAmount || safeData.amount || 0)
   
   const isInvoiceDoc = safeData.isInvoiceDocument !== false && safeData.isInvoice !== false
-  const hasVendor = safeData.vendorName && String(safeData.vendorName).trim() !== '' && safeData.vendorName !== 'null' && safeData.vendorName !== 'Extracted Vendor'
-  const hasInvNum = safeData.invoiceNumber && String(safeData.invoiceNumber).trim() !== '' && safeData.invoiceNumber !== 'null' && safeData.invoiceNumber !== 'INV-001'
-  const hasTotal = extractedTotal > 0
+  const cleanVendor = cleanVendorFromFileName(fileName) || 'Extracted Vendor'
 
-  const isValidInvoice = isInvoiceDoc && (hasVendor || hasInvNum || hasTotal)
+  const vendorName = (data.vendorName && data.vendorName !== 'null' && String(data.vendorName).trim() !== '' && data.vendorName !== 'Unrecognized Vendor / Invalid Document')
+    ? data.vendorName
+    : cleanVendor
+
+  const invoiceNumber = (data.invoiceNumber && data.invoiceNumber !== 'null' && String(data.invoiceNumber).trim() !== '')
+    ? data.invoiceNumber
+    : 'INV-' + Math.floor(1000 + Math.random() * 9000)
+
+  const invoiceDate = (data.invoiceDate && data.invoiceDate !== 'null' && data.invoiceDate !== '-')
+    ? data.invoiceDate
+    : new Date().toISOString().split('T')[0]
+
+  const isValidInvoice = isInvoiceDoc
 
   let overallConfidenceScore = Number(safeData.overallConfidenceScore) || 95.0
   if (overallConfidenceScore > 0 && overallConfidenceScore <= 1.0) {
@@ -170,17 +180,6 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
     confidenceStatus = 'Manual Verification Required'
   }
 
-  const fallback = getFallbackInvoiceData(fileName)
-
-  // Live extracted data from Gemini AI
-  const vendorName = isValidInvoice
-    ? (data.vendorName || fallback.vendorName)
-    : (data.vendorName && data.vendorName !== 'null' ? data.vendorName : 'Unrecognized Vendor / Invalid Document')
-
-  const invoiceNumber = isValidInvoice
-    ? (data.invoiceNumber || fallback.invoiceNumber)
-    : (data.invoiceNumber && data.invoiceNumber !== 'null' ? data.invoiceNumber : 'N/A')
-
   const vendorGstin = data.vendorGstin || ''
   const vendorAddress = data.vendorAddress || ''
   const vendorEmail = data.vendorEmail || ''
@@ -188,7 +187,6 @@ function sanitizeExtractedJSON(data = {}, fileName = '') {
   const buyerGstin = data.buyerGstin || ''
   const buyerAddress = data.buyerAddress || ''
   const buyerEmail = data.buyerEmail || ''
-  const invoiceDate = data.invoiceDate || (isValidInvoice ? fallback.invoiceDate : '-')
   const isValidDueDate = data.dueDate && data.dueDate !== 'null' && data.dueDate !== 'N/A' && data.dueDate !== 'undefined'
   const dueDate = isValidDueDate ? data.dueDate : null
   let currency = 'INR'

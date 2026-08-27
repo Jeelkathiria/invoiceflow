@@ -1,6 +1,20 @@
 import * as dashboardService from '../services/dashboard.service.js'
 import { successResponse, errorResponse } from '../utils/apiResponse.js'
 
+const handleControllerError = (err, res, next) => {
+  if (typeof next === 'function') {
+    try {
+      return next(err)
+    } catch (e) {
+      // Fall through to direct error response
+    }
+  }
+  console.error('[Dashboard Controller Error]:', err)
+  const statusCode = err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500)
+  const message = err.message || 'Dashboard request failed'
+  return errorResponse(res, statusCode, message)
+}
+
 export const getStats = async (req, res, next) => {
   try {
     const { timeframe, startDate, endDate } = req.query
@@ -12,7 +26,7 @@ export const getStats = async (req, res, next) => {
     })
     return successResponse(res, 200, 'Dashboard statistics fetched', stats)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -22,7 +36,7 @@ export const getRecentUploads = async (req, res, next) => {
     const recent = await dashboardService.getRecentUploads({ user: req.user, limit })
     return successResponse(res, 200, 'Recent uploads fetched', recent)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -32,7 +46,7 @@ export const getActivityTimeline = async (req, res, next) => {
     const activity = await dashboardService.getActivityTimeline({ user: req.user, limit })
     return successResponse(res, 200, 'Activity timeline fetched', activity)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -45,7 +59,7 @@ export const getFinanceTeamOverview = async (req, res, next) => {
     const team = await dashboardService.getFinanceTeamOverview()
     return successResponse(res, 200, 'Finance team overview fetched', team)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -55,7 +69,7 @@ export const getNeedsAttentionInvoices = async (req, res, next) => {
     const invoices = await dashboardService.getNeedsAttentionInvoices(limit)
     return successResponse(res, 200, 'Invoices requiring attention fetched', invoices)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -64,7 +78,7 @@ export const getRiskOverview = async (req, res, next) => {
     const risk = await dashboardService.getRiskOverview()
     return successResponse(res, 200, 'Risk and exception overview fetched', risk)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -73,6 +87,6 @@ export const getAIInsights = async (req, res, next) => {
     const insights = await dashboardService.getAIInsights()
     return successResponse(res, 200, 'AI insights fetched', insights)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }

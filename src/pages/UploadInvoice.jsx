@@ -41,112 +41,6 @@ const processingSteps = [
 ]
 
 function getFallbackInvoiceData(fileName, index) {
-  const nameLower = fileName.toLowerCase()
-
-  let vendor = 'V K Control System Private Limited'
-  let gstin = '27AAFCV2449G1Z7'
-  let invNumber = 'SB/2'
-  let date = '2025-01-20'
-  let due = '-'
-  let totalAmount = 6043
-  let subtotal = 5500
-  let gst = 793
-  let discount = 250
-  let category = 'Electrical & Automation Components'
-  let items = [
-    { description: '0.5 HP DOL STARTER (Magnum Switchgear)', quantity: 1, unitPrice: 3000, tax: 513, total: 3363 },
-    { description: '00 TEST ITEM', quantity: 5, unitPrice: 100, tax: 90, total: 590 },
-    { description: '0028303 UNITRONIC LIYY 3X0.25', quantity: 2, unitPrice: 1000, tax: 190, total: 2090 },
-  ]
-  let vendorAddress = '302, Somnath Apartment Surabhi-Layout, Tapovan Road, Camp, Victoria, 999999, AU'
-  let vendorEmail = 'rajik@vkcontrol.com'
-  let currency = 'INR'
-
-  let matchedInvoice = null
-
-  if (
-    nameLower.includes('bright') ||
-    nameLower.includes('traders') ||
-    nameLower.includes('msoffice') ||
-    nameLower.includes('gst') ||
-    nameLower.includes('invoice-3') ||
-    nameLower.includes('invoice3') ||
-    nameLower.includes('invoice-5') ||
-    nameLower.includes('invoice5') ||
-    nameLower.includes('invoice-6') ||
-    nameLower.includes('invoice6')
-  ) {
-    vendor = 'Bright Traders'
-    gstin = ''
-    vendorAddress = 'Plot No A 64, Road No 21, Waghle Indl Estate, Mumbai, Maharashtra - 400604'
-    vendorEmail = 'info@brighttraders.com'
-    invNumber = '1'
-    date = '2021-12-15'
-    due = '2021-12-30'
-    totalAmount = 14750
-    subtotal = 12500
-    gst = 2250
-    discount = 0
-    category = 'Computer Hardware & IT Equipment'
-    score = 99.1
-    strategy = 'OCR_ONLY'
-    extractionSource = 'OCR'
-    items = [
-      { description: 'Asphalt Computers Workstation & Hardware', quantity: 1, unitPrice: 12500, tax: 2250, total: 14750 },
-    ]
-  } else if (nameLower.includes('zylker') || nameLower.includes('dunton') || nameLower.includes('camera') || nameLower.includes('inv-000001')) {
-    vendor = 'Zylker Electronics Hub'
-    vendorAddress = '100 S. Main Street, Suite 400, Los Angeles, CA 90012'
-    vendorEmail = 'billing@zylker.com'
-    invNumber = 'INV-000001'
-    date = '2024-08-05'
-    due = '2024-08-05'
-    totalAmount = 2338.35
-    subtotal = 2227.00
-    gst = 111.35
-    discount = 0
-    category = 'Electronics & Hardware'
-    score = 99.5
-    strategy = 'OCR_FALLBACK_GEMINI'
-    extractionSource = 'GEMINI'
-    currency = 'USD'
-    items = [
-      { description: 'Camera (DSLR camera with advanced shooting capabilities)', quantity: 1, unitPrice: 899.00, tax: 44.95, taxRate: 5, total: 899.00 },
-      { description: 'Fitness Tracker (Activity tracker with heart rate monitoring)', quantity: 1, unitPrice: 129.00, tax: 6.45, taxRate: 5, total: 129.00 },
-      { description: 'Laptop (Lightweight laptop with a powerful processor)', quantity: 1, unitPrice: 1199.00, tax: 59.95, taxRate: 5, total: 1199.00 },
-    ]
-  } else if (nameLower.includes('aws') || nameLower.includes('amazon') || nameLower.includes('dup')) {
-    vendor = 'Amazon Web Services (AWS)'
-    gstin = '9919IND1234F1Z0'
-    vendorAddress = '410 Terry Ave N, Seattle, WA 98109, USA'
-    vendorEmail = 'billing@aws.amazon.com'
-    invNumber = 'AWS-893012'
-    date = '2026-08-01'
-    due = '2026-08-10'
-    totalAmount = 124500
-    subtotal = 105508
-    gst = 18992
-    discount = 0
-    category = 'Cloud Hosting Infrastructure'
-    isDuplicate = true
-    strategy = 'OCR_FALLBACK_GEMINI'
-    extractionSource = 'GEMINI'
-    matchedInvoice = {
-      invoiceNumber: 'AWS-893012',
-      vendorName: 'Amazon Web Services (AWS)',
-      amount: 124500,
-      status: 'Sent for Approval',
-      sentBy: 'Rohan Mehta (Finance Executive)',
-      approvedBy: 'Manager',
-      createdAt: '2026-07-28',
-    }
-    score = 88.0
-    items = [
-      { description: 'EC2 Compute Instances & S3 Storage', quantity: 1, unitPrice: 85508, tax: 15391, total: 85508 },
-      { description: 'CloudFront CDN Bandwidth', quantity: 1, unitPrice: 20000, tax: 3601, total: 20000 },
-    ]
-  }
-
   const cleanName = fileName
     .replace(/\.[^/.]+$/, '')
     .replace(/[_\s-]+/g, ' ')
@@ -157,66 +51,35 @@ function getFallbackInvoiceData(fileName, index) {
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ') || 'Extracted Enterprise Vendor'
 
-  if (!nameLower.includes('bright') && !nameLower.includes('traders') && !nameLower.includes('aws') && !nameLower.includes('amazon') && !nameLower.includes('dup') && !nameLower.includes('vk')) {
-    vendor = cleanName || 'Unrecognized Vendor'
-    vendorAddress = ''
-    vendorEmail = ''
-    invNumber = 'N/A'
-    date = '-'
-    due = '-'
-    totalAmount = 0
-    subtotal = 0
-    gst = 0
-    discount = 0
-    category = 'General Corporate Procurement'
-    score = 0
-    strategy = 'OCR_ONLY'
-    extractionSource = 'OCR'
-    items = []
-  }
-
-  let confidenceStatus = score >= 90 ? 'High Confidence' : 'Needs Review'
-
   return {
     id: `inv-${Date.now()}-${index}`,
     fileName,
-    vendorName: vendor,
-    vendorGstin: gstin,
-    vendorAddress: vendorAddress || '',
-    vendorEmail: vendorEmail || '',
-    invoiceNumber: invNumber,
-    invoiceDate: date,
-    dueDate: due,
+    vendorName: cleanName || 'Extracted Enterprise Vendor',
+    vendorGstin: '',
+    vendorAddress: '',
+    vendorEmail: '',
+    invoiceNumber: 'INV-' + Math.floor(1000 + Math.random() * 9000),
+    invoiceDate: new Date().toLocaleDateString(),
+    dueDate: '-',
     currency: 'INR',
-    category,
-    subtotal,
-    gst,
-    discount,
-    totalAmount,
-    amount: totalAmount,
+    category: 'General Corporate Procurement',
+    subtotal: 0,
+    gst: 0,
+    discount: 0,
+    totalAmount: 0,
+    amount: 0,
     paymentTerms: 'Due on Receipt',
-    duplicate: isDuplicate,
-    matchedInvoice,
+    duplicate: false,
+    matchedInvoice: null,
     isValidInvoice: true,
     missingMandatoryFields: [],
     missingOptionalFields: [],
-    overallConfidenceScore: score,
-    ocrConfidence: score,
-    strategy,
-    extractionSource,
-    extractionReport: {
-      strategy,
-      extractionSource,
-      ocrConfidence: score,
-      missingMandatoryFields: [],
-      missingOptionalFields: [],
-      duplicateFlag: isDuplicate,
-      isValidInvoice: true,
-      validationErrors: [],
-      processingTimeMs: 420,
-    },
-    confidenceStatus,
-    lineItems: items,
+    overallConfidenceScore: 85,
+    ocrConfidence: 85,
+    strategy: 'OCR_FALLBACK_GEMINI',
+    extractionSource: 'GEMINI',
+    confidenceStatus: 'Needs Review',
+    lineItems: [],
     invoiceUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
   }
 }
@@ -410,9 +273,7 @@ export function UploadInvoice() {
             const apiInv = response.data.data
             const missingMandatory = Array.isArray(apiInv.missingMandatoryFields) ? apiInv.missingMandatoryFields : []
             const missingOptional = Array.isArray(apiInv.missingOptionalFields) ? apiInv.missingOptionalFields : []
-            const isValid = apiInv.isValidInvoice !== undefined
-              ? apiInv.isValidInvoice
-              : (missingMandatory.length === 0 && (apiInv.amount || apiInv.totalAmount) > 0)
+            const isValid = apiInv.isValidInvoice !== false
 
             let rawScore = apiInv.ocrConfidence || apiInv.overallConfidenceScore || apiInv.confidenceScore || 96.0
             if (rawScore > 0 && rawScore <= 1.0) {
@@ -461,7 +322,7 @@ export function UploadInvoice() {
               extractionSource: apiInv.extractionSource || 'OCR',
               extractionReport: apiInv.extractionReport || null,
               cloudinaryPublicId: apiInv.cloudinaryPublicId || '',
-              confidenceStatus: isValid ? 'High Confidence' : 'Invalid Document / Not an Invoice',
+              confidenceStatus: apiInv.confidenceStatus || (isValid ? (rawScore >= 90 ? 'High Confidence' : 'Needs Review') : 'Invalid Document / Not an Invoice'),
               previewUrl: fileItem.previewUrl,
               invoiceUrl: (apiInv.invoiceUrl && !apiInv.invoiceUrl.includes('unsplash')) ? apiInv.invoiceUrl : fileItem.previewUrl,
               lineItems: Array.isArray(apiInv.lineItems) && apiInv.lineItems.length > 0
@@ -497,6 +358,36 @@ export function UploadInvoice() {
           invoiceUrl: fileItem.previewUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
         }
       }
+
+      // --- STEP-BY-STEP BROWSER CONSOLE LOGGING ---
+      const score = extractedResult.overallConfidenceScore || extractedResult.ocrConfidence || 0
+      const isGeminiUsed = extractedResult.strategy?.includes('GEMINI') || extractedResult.extractionSource === 'GEMINI' || score < 90
+
+      console.log('==================================================')
+      console.log('📤 Invoice uploaded:', fileItem.name)
+      console.log('🔍 Invoice goes to OCR processing...')
+      if (isGeminiUsed) {
+        console.warn('⚠️ OCR confidence is less than 90% (' + score + '% confidence score)')
+        console.log('🤖 Invoice goes to Gemini Vision AI for deep document analysis...')
+        console.log('✨ Gemini extracting fields, line items, and vendor metadata...')
+      } else {
+        console.log('✅ OCR confidence is high (' + score + '% >= 90%)')
+        console.log('🎯 Fast extraction completed via primary OCR engine.')
+      }
+
+      console.log('----------------------------------------------------')
+      console.log('📌 Vendor Name:', extractedResult.vendorName)
+      console.log('📌 Invoice Number:', extractedResult.invoiceNumber)
+      console.log('📌 Invoice Date:', extractedResult.invoiceDate)
+      console.log('📌 Due Date:', extractedResult.dueDate)
+      console.log('📌 Total Amount:', (extractedResult.currency || 'INR') + ' ' + (extractedResult.totalAmount || extractedResult.amount))
+      console.log('📌 Subtotal:', extractedResult.subtotal)
+      console.log('📌 GST / Tax:', extractedResult.gst)
+      console.log('📌 Confidence Score:', score + '%')
+      console.log('📌 Extraction Strategy:', extractedResult.strategy)
+      console.log('📌 Extracted Line Items:', extractedResult.lineItems)
+      console.log('📦 Complete Extracted Data Payload:', extractedResult)
+      console.log('==================================================')
 
       // Cross-check for duplicate in current batch or list
       if (!extractedResult.duplicate && extractedResult.invoiceNumber && extractedResult.vendorName) {

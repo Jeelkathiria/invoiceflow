@@ -1,12 +1,24 @@
 import { User } from '../models/User.js'
 import { successResponse, errorResponse } from '../utils/apiResponse.js'
 
+const handleControllerError = (err, res, next) => {
+  if (typeof next === 'function') {
+    try {
+      return next(err)
+    } catch (e) {}
+  }
+  console.error('[Profile Controller Error]:', err)
+  const statusCode = err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500)
+  const message = err.message || 'Profile operation failed'
+  return errorResponse(res, statusCode, message)
+}
+
 export const getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select('-password')
     return successResponse(res, 200, 'Profile fetched successfully', user)
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -28,7 +40,7 @@ export const updateProfile = async (req, res, next) => {
       avatar: user.avatar,
     })
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
 
@@ -54,6 +66,6 @@ export const updatePassword = async (req, res, next) => {
 
     return successResponse(res, 200, 'Password updated successfully')
   } catch (error) {
-    next(error)
+    return handleControllerError(error, res, next)
   }
 }
